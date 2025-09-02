@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+
+#	Push 1.2
+#	Pushes to Git
+#	Dependencies: git
+#	Usage: Just run the script.
+#
+#	By Joris van Dijk | Joris.codes 
+#	Licensed under the MIT license
+
+# Define color codes
+COLOR_RESET="\e[0m"
+COLOR_GREEN="\e[32m"
+COLOR_YELLOW="\e[33m"
+COLOR_RED="\e[31m"
+
+# Function to print messages with colors
+info() {
+    echo -e "${COLOR_GREEN}[INFO] $1${COLOR_RESET}"
+}
+
+warning() {
+    echo -e "${COLOR_YELLOW}[WARNING] $1${COLOR_RESET}"
+}
+
+error() {
+    echo -e "${COLOR_RED}[ERROR] $1${COLOR_RESET}"
+}
+
+# Function to clean up and undo changes
+cleanup() {
+    warning "Undoing staged changes..."
+    git reset &>/dev/null || true
+    warning "Changes have been unstaged. Working directory left intact."
+    exit 1
+}
+
+# Trap Ctrl+C to execute cleanup
+trap cleanup INT
+
+# Stage all changes
+info "Staging changes..."
+git add .
+if [[ $? -ne 0 ]]; then
+    error "Failed to stage changes. Exiting."
+    exit 1
+fi
+info "Changes staged successfully."
+
+# Show the status
+info "Git status:"
+git status
+
+# Prompt for a commit message
+echo
+read -p "$(echo -e "${COLOR_YELLOW}Enter commit message (or press Ctrl+C to cancel): ${COLOR_RESET}")" commit_msg
+
+# Check if commit message is empty
+if [[ -z "$commit_msg" ]]; then
+    warning "Commit message cannot be empty. Exiting."
+    cleanup
+fi
+
+# Commit the changes
+info "Committing changes..."
+if ! git commit -m "$commit_msg"; then
+    error "Commit failed. Undoing staged changes."
+    cleanup
+fi
+info "Changes committed successfully."
+
+# Push the changes
+info "Pushing changes..."
+if ! git push; then
+    warning "Push failed. Checking if upstream branch is missing..."
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+    if [[ -z "$current_branch" ]]; then
+        error "Unable to determine the current branch. Exiting."
+        cleanup
+    fi
+    warning "No upstream branch set for '$current_branch'. Setting upstream..."
+    if git push --set-upstream origin "$current_branch"; then
+        info "Upstream branch set successfully and changes pushed."
+    else
+        error "Failed to push changes after setting upstream branch."
+        cleanup
+    fi
+else
+    info "Changes committed and pushed successfully."
+fi
+
+exit 0

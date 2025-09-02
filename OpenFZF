@@ -1,0 +1,11 @@
+#!/usr/bin/env zsh
+cd || exit 1
+
+# Use a zsh array instead of mapfile
+files=($(fzf -m --preview="bat --color=always {}"))
+
+# Exit if no files selected
+[[ ${#files[@]} -eq 0 ]] && exit 0
+
+# Open all selected files in micro
+micro "${files[@]}"

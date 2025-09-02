@@ -1,0 +1,36 @@
+#!/bin/sh
+# Simple Git Mirror Setup Script
+# Usage: ./new-repository.sh REPO_NAME REPO_PATH
+
+set -e
+
+if [ $# -ne 2 ]; then
+    echo "Usage: $0 REPO_NAME REPO_PATH"
+    exit 1
+fi
+
+REPO_NAME="$1"
+REPO_PATH="$2"
+
+if [ ! -d "$REPO_PATH" ]; then
+    echo "Error: Directory $REPO_PATH does not exist"
+    exit 1
+fi
+
+if [ -d "$REPO_PATH/.git" ]; then
+    echo "Error: $REPO_PATH already has a .git directory"
+    exit 1
+fi
+
+cd "$REPO_PATH"
+
+git init
+git branch -M main
+git remote add origin git@bitbucket.org:jorisvdijk/$REPO_NAME.git
+git remote set-url --add --push origin git@bitbucket.org:jorisvdijk/$REPO_NAME.git
+git remote set-url --add --push origin git@github.com:jorisvandijk/$REPO_NAME.git
+git remote set-url --add --push origin git@gitlab.com:jorisvandijk/$REPO_NAME.git
+git remote set-url --add --push origin git@codeberg.org:jorisvandijk/$REPO_NAME.git
+
+echo "Git repository initialized with multi-platform push setup"
+echo "Use 'git push origin main' after your first commit"
