@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# @raycast.title System Info
+#	Info 2.6 - macOS Version
+#	Shows time, date and system information in a notification for macOS
+#	Dependencies: terminal-notifier (brew install terminal-notifier)
+#                 brightness (brew install brightness) - optional for brightness monitoring
+#   Usage: Just run the script.
+#
+#	Adapted from original Hyprland script by Joris van Dijk | Joris.codes 
+#	Licensed under the MIT license
+
+battery() {
+    # Get battery info using pmset
+    battery_info=$(pmset -g batt | grep -E "([0-9]+\%).*(discharging|charging)")
+    
+    if [[ -z "$battery_info" ]]; then
+        echo "🔋 Battery info unavailable"
+        return
+    fi
+    
+    # Extract percentage and status
+    percentage=$(echo "$battery_info" | grep -o '[0-9]*%' | head -1 | sed 's/%//')
+    status=$(echo "$battery_info" | grep -o -E "(discharging|charging)" | head -1)
+    
+    # Determine the charging status and icon
+    if [[ $status == "charging" ]]; then
+        icon="🔌"
+    elif [[ $percentage -ge 5 ]] && [[ $percentage -le 19 ]]; then
+        icon="🪫"
+    elif [[ $percentage -ge 20 ]] && [[ $percentage -le 39 ]]; then
+        icon="🔋"
+    elif [[ $percentage -ge 40 ]] && [[ $percentage -le 59 ]]; then
+        icon="🔋"
+    elif [[ $percentage -ge 60 ]] && [[ $percentage -le 79 ]]; then
+        icon="🔋"
+    elif [[ $percentage -ge 80 ]] && [[ $percentage -le 95 ]]; then
+        icon="🔋"
+    elif [[ $percentage -ge 96 ]] && [[ $percentage -le 100 ]]; then
+        icon="🔋"
+    fi
+    echo "$icon $percentage%"
+}
+
+datetime() {
+    if [[ $1 = 'd' ]]; then
+        icon="📅"
+        info="$(date "+%A %-d/%-m/%Y")"
+    elif [[ $1 = 't' ]]; then
+        icon="⏰"
+        info="$(date "+%H:%M")"
+    else
+        icon="❓"
+        info="Incorrect or missing flag"
+    fi
+    echo "$icon $info"
+}
+
+volume() {
+    # Get volume using osascript
+    vol=$(osascript -e 'output volume of (get volume settings)')
+    muted=$(osascript -e 'output muted of (get volume settings)')
+    
+    if [[ $muted == "true" ]]; then
+        icon="🔇"
+    else
+        icon="🔊"
+    fi
+    echo "$icon $vol%"
+}
+
+# Check if terminal-notifier is installed
+if ! command -v terminal-notifier &> /dev/null; then
+    echo "terminal-notifier is required but not installed."
+    echo "Install it with: brew install terminal-notifier"
+    exit 1
+fi
+
+options=( "datetime t" "datetime d" "battery" "volume" )
+output=""
+
+for i in "${options[@]}"; do
+    result=$($i)
+    output+="$result\n"
+done
+
+# Use terminal-notifier for macOS notifications
+echo -e "$output" | terminal-notifier -title "System Info" -timeout 6
