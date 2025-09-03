@@ -1,0 +1,157 @@
+#!/bin/bash
+
+REPOS_FILE="$HOME/.config/repos/repos"
+
+init_config() {
+    mkdir -p "$(dirname "$REPOS_FILE")"
+    touch "$REPOS_FILE"
+}
+
+add_repo() {
+    local repo_path=$(realpath "$1" 2>/dev/null)
+    if [[ ! -d "$repo_path/.git" ]]; then
+        echo "Error: $1 is not a git repository"
+        exit 1
+    fi
+    
+    init_config
+    if grep -q "^$repo_path$" "$REPOS_FILE"; then
+        echo "Repository already tracked: $repo_path"
+    else
+        echo "$repo_path" >> "$REPOS_FILE"
+        echo "Added: $repo_path"
+    fi
+}
+
+bulk_add() {
+    local base_dir=$(realpath "$1" 2>/dev/null)
+    if [[ ! -d "$base_dir" ]]; then
+        echo "Error: Directory does not exist: $1"
+        exit 1
+    fi
+    
+    init_config
+    for dir in "$base_dir"/*; do
+        if [[ -d "$dir/.git" ]]; then
+            local repo_path=$(realpath "$dir")
+            if ! grep -q "^$repo_path$" "$REPOS_FILE"; then
+                echo "$repo_path" >> "$REPOS_FILE"
+                echo "Added: $repo_path"
+            fi
+        fi
+    done
+}
+
+remove_repo() {
+    local repo_path=$(realpath "$1" 2>/dev/null)
+    if [[ -z "$repo_path" ]]; then
+        repo_path="$1"
+    fi
+    init_config
+    if grep -q "^$repo_path$" "$REPOS_FILE"; then
+        grep -v "^$repo_path$" "$REPOS_FILE" > "$REPOS_FILE.tmp"
+        mv "$REPOS_FILE.tmp" "$REPOS_FILE"
+        echo "Removed: $repo_path"
+    else
+        echo "Repository not found in tracking list: $repo_path"
+    fi
+}
+
+get_repo_status() {
+    local repo_path="$1"
+    if [[ ! -d "$repo_path" ]]; then
+        echo "repository not found"
+        return
+    fi
+    
+    if [[ ! -d "$repo_path/.git" ]]; then
+        echo "not a git repo"
+        return
+    fi
+    
+    cd "$repo_path" || return
+    
+    local status_output=$(git status --porcelain 2>/dev/null)
+    local ahead_behind=$(git rev-list --count --left-right @{upstream}...HEAD 2>/dev/null || echo "0	0")
+    local behind=$(echo "$ahead_behind" | cut -f1)
+    local ahead=$(echo "$ahead_behind" | cut -f2)
+    
+    local status_parts=()
+    
+    if [[ -n "$status_output" ]]; then
+        local modified=$(echo "$status_output" | grep -c "^.M\|^M")
+        local untracked=$(echo "$status_output" | grep -c "^??")
+        local staged=$(echo "$status_output" | grep -c "^[MADRC]")
+        
+        [[ $staged -gt 0 ]] && status_parts+=("$staged staged")
+        [[ $modified -gt 0 ]] && status_parts+=("$modified modified")
+        [[ $untracked -gt 0 ]] && status_parts+=("$untracked untracked")
+    fi
+    
+    [[ $ahead -gt 0 ]] && status_parts+=("ahead $ahead")
+    [[ $behind -gt 0 ]] && status_parts+=("behind $behind")
+    
+    if [[ ${#status_parts[@]} -eq 0 ]]; then
+        echo "clean"
+    else
+        local IFS=" "
+        echo "${status_parts[*]}"
+    fi
+}
+
+list_repos() {
+    init_config
+    if [[ ! -s "$REPOS_FILE" ]]; then
+        echo "No repositories tracked. Use 'repos add <repo>' to add some."
+        exit 0
+    fi
+    
+    while IFS= read -r repo_path; do
+        local repo_status=$(get_repo_status "$repo_path")
+        printf "%-50s %s\n" "$repo_path" "$repo_status"
+    done < "$REPOS_FILE"
+}
+
+show_usage() {
+    echo "Usage: repos [command] [options]"
+    echo "Commands:"
+    echo "  add <repo>     Add a git repository to tracking"
+    echo "  add -r <dir>   Bulk add all git repos in directory"
+    echo "  remove <repo>  Remove a repository from tracking"
+    echo "  (no args)      List and select repositories with fzf"
+}
+
+case "$1" in
+    "add")
+        if [[ "$2" == "-r" ]]; then
+            if [[ -z "$3" ]]; then
+                echo "Error: Please specify directory for bulk add"
+                show_usage
+                exit 1
+            fi
+            bulk_add "$3"
+        elif [[ -n "$2" ]]; then
+            add_repo "$2"
+        else
+            echo "Error: Please specify repository path"
+            show_usage
+            exit 1
+        fi
+        ;;
+    "remove")
+        if [[ -n "$2" ]]; then
+            remove_repo "$2"
+        else
+            echo "Error: Please specify repository path"
+            show_usage
+            exit 1
+        fi
+        ;;
+    "")
+        list_repos
+        ;;
+    *)
+        show_usage
+        exit 1
+        ;;
+esac

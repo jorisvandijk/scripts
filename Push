@@ -16,15 +16,15 @@ COLOR_RED="\e[31m"
 
 # Function to print messages with colors
 info() {
-    echo -e "${COLOR_GREEN}[INFO] $1${COLOR_RESET}"
+    printf "${COLOR_GREEN}[INFO] %s${COLOR_RESET}\n" "$1"
 }
 
 warning() {
-    echo -e "${COLOR_YELLOW}[WARNING] $1${COLOR_RESET}"
+    printf "${COLOR_YELLOW}[WARNING] %s${COLOR_RESET}\n" "$1"
 }
 
 error() {
-    echo -e "${COLOR_RED}[ERROR] $1${COLOR_RESET}"
+    printf "${COLOR_RED}[ERROR] %s${COLOR_RESET}\n" "$1"
 }
 
 # Function to clean up and undo changes
@@ -53,7 +53,8 @@ git status
 
 # Prompt for a commit message
 echo
-read -p "$(echo -e "${COLOR_YELLOW}Enter commit message (or press Ctrl+C to cancel): ${COLOR_RESET}")" commit_msg
+printf "${COLOR_YELLOW}Enter commit message (or press Ctrl+C to cancel): ${COLOR_RESET}"
+read commit_msg
 
 # Check if commit message is empty
 if [[ -z "$commit_msg" ]]; then
