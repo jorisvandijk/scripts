@@ -1,7 +1,164 @@
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-._*
-.Spotlight-V100
-.Trashes
+#!/usr/bin/env bash
+
+# ─── Config ────────────────────────────────────────────────────────────────────
+DEFAULT_USER="root"
+DEFAULT_IP="192.168.1.5"
+FZF_DEPTH=5
+RSYNC_FLAGS=(-a --no-owner -h --progress --partial)
+MANUAL_OPT="── Enter path manually ──"
+# ───────────────────────────────────────────────────────────────────────────────
+
+die() { echo "Error: $*" >&2; exit 1; }
+
+check_deps() {
+    command -v rsync >/dev/null 2>&1 || die "rsync is not installed"
+    command -v fzf   >/dev/null 2>&1 || die "fzf is not installed"
+}
+
+ask_trailing_slash() {
+    local path="$1"
+    local name
+    name=$(basename "${path%/}")
+    echo "" >&2
+    echo "Sync the folder itself, or its contents?" >&2
+    echo "  1) Folder itself   → destination/$name/" >&2
+    echo "  2) Contents only   → destination/*" >&2
+    read -rp "Choice [1/2]: " slash_choice </dev/tty
+    case "$slash_choice" in
+        2) echo "${path%/}/" ;;
+        *) echo "${path%/}"  ;;
+    esac
+}
+
+list_local() {
+    if command -v fd >/dev/null 2>&1; then
+        fd --type d --max-depth "$FZF_DEPTH" . / \
+            --exclude /proc --exclude /sys --exclude /dev \
+            --exclude /run  --exclude /private/var 2>/dev/null
+    else
+        find / -maxdepth "$FZF_DEPTH" -type d \
+            \( -path /proc -o -path /sys -o -path /dev -o -path /run -o -path /private/var \) \
+            -prune -o -type d -print 2>/dev/null
+    fi
+}
+
+list_remote() {
+    local creds="$1"
+    ssh -o ConnectTimeout=10 "$creds" \
+        "if command -v fd >/dev/null 2>&1; then
+            fd --type d --max-depth $FZF_DEPTH . / 2>/dev/null
+        else
+            find / -maxdepth $FZF_DEPTH -type d 2>/dev/null
+        fi"
+}
+
+pick_local() {
+    local prompt="${1:-Select local directory:}"
+    local selected
+
+    selected=$(
+        { printf '%s\n' "$MANUAL_OPT"; list_local; } \
+        | fzf --prompt="$prompt " --height=40% </dev/tty
+    )
+
+    [[ -z "$selected" ]] && die "No selection made."
+
+    if [[ "$selected" == "$MANUAL_OPT" ]]; then
+        read -rp "Enter local path: " selected </dev/tty
+    fi
+
+    echo "$selected"
+}
+
+get_credentials() {
+    local user ip
+    read -rp "Username [$DEFAULT_USER]: " user </dev/tty
+    user="${user:-$DEFAULT_USER}"
+    read -rp "IP address [$DEFAULT_IP]: " ip </dev/tty
+    ip="${ip:-$DEFAULT_IP}"
+    echo "${user}@${ip}"
+}
+
+pick_remote() {
+    local creds="$1"
+    local prompt="${2:-Select remote directory:}"
+    local listing selected
+
+    echo "Fetching directory listing from $creds..." >&2
+    listing=$(list_remote "$creds")
+    if [[ $? -ne 0 || -z "$listing" ]]; then
+        die "Could not connect to $creds. Check that SSH access is working:\n  ssh $creds"
+    fi
+
+    selected=$(
+        { printf '%s\n' "$MANUAL_OPT"; printf '%s\n' "$listing"; } \
+        | fzf --prompt="$prompt " --height=40% </dev/tty
+    )
+
+    [[ -z "$selected" ]] && die "No selection made."
+
+    if [[ "$selected" == "$MANUAL_OPT" ]]; then
+        read -rp "Enter remote path: " selected </dev/tty
+    fi
+
+    echo "${creds}:${selected}"
+}
+
+# ─── Main ───────────────────────────────────────────────────────────────────────
+
+check_deps
+
+echo ""
+echo "Select sync mode:"
+echo "  1) local   → local"
+echo "  2) local   → external"
+echo "  3) external → local"
+echo ""
+read -rp "Choice [1-3]: " mode </dev/tty
+
+case "$mode" in
+    1)
+        echo ""
+        echo "── Source ─────────────────────────────"
+        src_raw=$(pick_local "Source:")
+        src=$(ask_trailing_slash "$src_raw")
+        echo ""
+        echo "── Destination ────────────────────────"
+        dst=$(pick_local "Destination:")
+        ;;
+    2)
+        echo ""
+        echo "── Source ─────────────────────────────"
+        src_raw=$(pick_local "Source:")
+        src=$(ask_trailing_slash "$src_raw")
+        echo ""
+        echo "── Destination ────────────────────────"
+        creds=$(get_credentials)
+        dst=$(pick_remote "$creds" "Destination on $creds:")
+        ;;
+    3)
+        echo ""
+        echo "── Source ─────────────────────────────"
+        creds=$(get_credentials)
+        src_raw=$(pick_remote "$creds" "Source on $creds:")
+        remote_path="${src_raw#*:}"
+        remote_prefix="${src_raw%%:*}:"
+        src_trailed=$(ask_trailing_slash "$remote_path")
+        src="${remote_prefix}${src_trailed}"
+        echo ""
+        echo "── Destination ────────────────────────"
+        dst=$(pick_local "Destination:")
+        ;;
+    *)
+        die "Invalid choice."
+        ;;
+esac
+
+echo ""
+echo "──────────────────────────────────────"
+echo "  From : $src"
+echo "  To   : $dst"
+echo "──────────────────────────────────────"
+echo ""
+
+rsync "${RSYNC_FLAGS[@]}" "$src" "$dst"

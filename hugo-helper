@@ -1,0 +1,24 @@
+#!/bin/zsh
+
+case "$1" in
+    server)
+        cd ~/git/website
+        hugo server -D
+        rm ~/git/website/.hugo_build.lock 2>/dev/null
+        ;;
+    new)
+        if [ -z "$2" ]; then
+            echo "Error: Post name required" >&2
+            echo "Usage: hn <post-name>" >&2
+            return 1
+        fi
+
+        cd ~/git/website
+        hugo new "posts/${2}.md"
+        micro content/posts/"${2}.md"
+        ;;
+    *)
+        echo "Usage: hugo-helper {server|new} [post-name]" >&2
+        return 1
+        ;;
+esac
