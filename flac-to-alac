@@ -1,0 +1,27 @@
+#!/bin/bash
+
+LOG_FILE="./log.txt"
+
+if [[ -z "$1" ]]; then
+    echo "Usage: $0 /path/to/music"
+    exit 1
+fi
+
+if [[ ! -d "$1" ]]; then
+    echo "Error: '$1' is not a directory"
+    exit 1
+fi
+
+find "$1" -type f -name "*.flac" | while read -r flac_file; do
+    m4a_file="${flac_file%.flac}.m4a"
+
+    echo "Converting: $flac_file"
+
+    if ffmpeg -y -i "$flac_file" -c:v copy -c:a alac "$m4a_file" -loglevel error < /dev/null; then
+        rm "$flac_file"
+        echo "Done: $m4a_file"
+    else
+        echo "FAILED: $flac_file — original kept"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] FAILED: $flac_file" >> "$LOG_FILE"
+    fi
+done
