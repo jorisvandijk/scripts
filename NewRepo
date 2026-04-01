@@ -1,6 +1,6 @@
 #!/bin/sh
 # Simple Git Mirror Setup Script
-# Usage: ./new-repository.sh REPO_NAME REPO_PATH
+# Usage: NewRepo REPO_NAME REPO_PATH
 
 set -e
 
