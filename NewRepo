@@ -1,36 +1,299 @@
 #!/bin/sh
-# Simple Git Mirror Setup Script
-# Usage: NewRepo REPO_NAME REPO_PATH
+# NewRepo - Initialize a local git repo and create it on all four platforms
+# Usage: NewRepo [--private] [--desc "description"] REPO_NAME REPO_PATH
+#
+# =============================================================================
+# INSTALL
+#
+# 1. Install the script:
+#      chmod +x NewRepo
+#      mv NewRepo ~/.local/bin/NewRepo
+#
+# 2. Create the config file:
+#      mkdir -p ~/git/documents/newrepo
+#      touch ~/git/documents/newrepo/config
+#      chmod 600 ~/git/documents/newrepo/config
+#
+# 3. Populate ~/git/documents/newrepo/config (quote all values):
+#      GITHUB_TOKEN="your_token_here"
+#      GITLAB_TOKEN="your_token_here"
+#      CODEBERG_TOKEN="your_token_here"
+#      BITBUCKET_WORKSPACE="jorisvdijk"
+#      BITBUCKET_EMAIL="your_atlassian_email_here"
+#      BITBUCKET_API_TOKEN="your_api_token_here"
+#
+# 4. Token scopes needed:
+#      GitHub:    Settings → Developer settings → Personal access tokens  (repo)
+#      GitLab:    Preferences → Access tokens                             (api)
+#      Codeberg:  Settings → Applications → Access tokens                 (read:user + write:repository)
+#      Bitbucket: id.atlassian.com → Security → API tokens               (Repositories: read+write)
+#
+# USAGE
+#
+#   NewRepo REPO_NAME REPO_PATH
+#   NewRepo --private REPO_NAME REPO_PATH
+#   NewRepo --private --desc "A short description" REPO_NAME REPO_PATH
+# =============================================================================
 
-set -e
+PRIVATE=false
+DESCRIPTION=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --private) PRIVATE=true; shift ;;
+        --desc)    DESCRIPTION="$2"; shift 2 ;;
+        --)        shift; break ;;
+        -*)        printf "Unknown option: %s\n" "$1"; exit 1 ;;
+        *)         break ;;
+    esac
+done
 
 if [ $# -ne 2 ]; then
-    echo "Usage: $0 REPO_NAME REPO_PATH"
+    printf "Usage: %s [--private] [--desc 'description'] REPO_NAME REPO_PATH\n" "$0"
     exit 1
 fi
 
 REPO_NAME="$1"
 REPO_PATH="$2"
 
+CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME}/git/documents/newrepo/config"
+
+if [ ! -f "$CONFIG_FILE" ]; then
+    printf "Error: Config file not found at %s\n\n" "$CONFIG_FILE"
+    printf "Create it with:\n\n"
+    printf "  mkdir -p \"\$(dirname %s)\"\n" "$CONFIG_FILE"
+    printf "  touch %s && chmod 600 %s\n\n" "$CONFIG_FILE" "$CONFIG_FILE"
+    printf "Then add (quote all values):\n\n"
+    printf "  GITHUB_TOKEN=\"your_token_here\"\n"
+    printf "  GITLAB_TOKEN=\"your_token_here\"\n"
+    printf "  CODEBERG_TOKEN=\"your_token_here\"\n"
+    printf "  BITBUCKET_WORKSPACE=\"jorisvdijk\"\n"
+    printf "  BITBUCKET_EMAIL=\"your_atlassian_email_here\"\n"
+    printf "  BITBUCKET_API_TOKEN=\"your_api_token_here\"\n\n"
+    printf "Token scopes needed:\n"
+    printf "  GitHub:    repo (or public_repo for public repos)\n"
+    printf "  GitLab:    api\n"
+    printf "  Codeberg:  read:user + write:repository\n"
+    printf "  Bitbucket: Repositories (read + write)\n"
+    exit 1
+fi
+
+# shellcheck source=/dev/null
+. "$CONFIG_FILE"
+
+# --- Local path checks (before any network calls) ---
+
 if [ ! -d "$REPO_PATH" ]; then
-    echo "Error: Directory $REPO_PATH does not exist"
+    printf "Error: Directory '%s' does not exist\n" "$REPO_PATH"
     exit 1
 fi
 
 if [ -d "$REPO_PATH/.git" ]; then
-    echo "Error: $REPO_PATH already has a .git directory"
+    printf "Error: '%s' already has a .git directory\n" "$REPO_PATH"
     exit 1
 fi
 
-cd "$REPO_PATH"
+# --- Preflight checks ---
+# Validates credentials and confirms the repo name is available on every platform.
+# ALL four must pass before anything is created.
 
+PREFLIGHT_FAILED=false
+
+check_github() {
+    printf "  GitHub...    "
+    AUTH=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: Bearer $GITHUB_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        https://api.github.com/user)
+    if [ "$AUTH" != "200" ]; then
+        printf "FAIL (invalid token, HTTP %s)\n" "$AUTH"; return 1
+    fi
+    EXIST=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: Bearer $GITHUB_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/jorisvandijk/$REPO_NAME")
+    if [ "$EXIST" = "200" ]; then
+        printf "FAIL (repo already exists)\n"; return 1
+    elif [ "$EXIST" = "404" ]; then
+        printf "OK\n"; return 0
+    else
+        printf "FAIL (unexpected HTTP %s)\n" "$EXIST"; return 1
+    fi
+}
+
+check_gitlab() {
+    printf "  GitLab...    "
+    AUTH=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+        https://gitlab.com/api/v4/user)
+    if [ "$AUTH" != "200" ]; then
+        printf "FAIL (invalid token, HTTP %s)\n" "$AUTH"; return 1
+    fi
+    EXIST=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+        "https://gitlab.com/api/v4/projects/jorisvandijk%2F$REPO_NAME")
+    if [ "$EXIST" = "200" ]; then
+        printf "FAIL (repo already exists)\n"; return 1
+    elif [ "$EXIST" = "404" ]; then
+        printf "OK\n"; return 0
+    else
+        printf "FAIL (unexpected HTTP %s)\n" "$EXIST"; return 1
+    fi
+}
+
+check_codeberg() {
+    printf "  Codeberg...  "
+    AUTH=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: token $CODEBERG_TOKEN" \
+        https://codeberg.org/api/v1/user)
+    if [ "$AUTH" != "200" ]; then
+        printf "FAIL (invalid token, HTTP %s)\n" "$AUTH"; return 1
+    fi
+    EXIST=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: token $CODEBERG_TOKEN" \
+        "https://codeberg.org/api/v1/repos/jorisvandijk/$REPO_NAME")
+    if [ "$EXIST" = "200" ]; then
+        printf "FAIL (repo already exists)\n"; return 1
+    elif [ "$EXIST" = "404" ]; then
+        printf "OK\n"; return 0
+    else
+        printf "FAIL (unexpected HTTP %s)\n" "$EXIST"; return 1
+    fi
+}
+
+check_bitbucket() {
+    printf "  Bitbucket... "
+    AUTH=$(curl -s -o /dev/null -w "%{http_code}" \
+        -u "$BITBUCKET_EMAIL:$BITBUCKET_API_TOKEN" \
+        https://api.bitbucket.org/2.0/user)
+    if [ "$AUTH" != "200" ]; then
+        printf "FAIL (invalid credentials, HTTP %s)\n" "$AUTH"; return 1
+    fi
+    EXIST=$(curl -s -o /dev/null -w "%{http_code}" \
+        -u "$BITBUCKET_EMAIL:$BITBUCKET_API_TOKEN" \
+        "https://api.bitbucket.org/2.0/repositories/$BITBUCKET_WORKSPACE/$REPO_NAME")
+    if [ "$EXIST" = "200" ]; then
+        printf "FAIL (repo already exists)\n"; return 1
+    elif [ "$EXIST" = "404" ]; then
+        printf "OK\n"; return 0
+    else
+        printf "FAIL (unexpected HTTP %s)\n" "$EXIST"; return 1
+    fi
+}
+
+printf "Preflight checks for '%s'...\n" "$REPO_NAME"
+check_github    || PREFLIGHT_FAILED=true
+check_gitlab    || PREFLIGHT_FAILED=true
+check_codeberg  || PREFLIGHT_FAILED=true
+check_bitbucket || PREFLIGHT_FAILED=true
+
+if [ "$PREFLIGHT_FAILED" = true ]; then
+    printf "\nPreflight failed. Nothing was created.\n"
+    exit 1
+fi
+
+# --- Create on all platforms ---
+
+printf "\nCreating remote repositories...\n"
+
+create_github() {
+    printf "  GitHub...    "
+    PRIVATE_VAL=$([ "$PRIVATE" = true ] && printf "true" || printf "false")
+    HTTP_CODE=$(curl -s -o /tmp/newrepo_gh.json -w "%{http_code}" \
+        -X POST \
+        -H "Authorization: Bearer $GITHUB_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        https://api.github.com/user/repos \
+        -d "{\"name\":\"$REPO_NAME\",\"description\":\"$DESCRIPTION\",\"private\":$PRIVATE_VAL}")
+    if [ "$HTTP_CODE" = "201" ]; then
+        printf "OK\n"
+    else
+        MSG=$(grep -o '"message":"[^"]*"' /tmp/newrepo_gh.json 2>/dev/null | head -1 | cut -d'"' -f4)
+        printf "FAILED (HTTP %s: %s)\n" "$HTTP_CODE" "$MSG"
+        rm -f /tmp/newrepo_gh.json
+        return 1
+    fi
+    rm -f /tmp/newrepo_gh.json
+}
+
+create_gitlab() {
+    printf "  GitLab...    "
+    VISIBILITY=$([ "$PRIVATE" = true ] && printf "private" || printf "public")
+    HTTP_CODE=$(curl -s -o /tmp/newrepo_gl.json -w "%{http_code}" \
+        -X POST \
+        -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+        -H "Content-Type: application/json" \
+        https://gitlab.com/api/v4/projects \
+        -d "{\"name\":\"$REPO_NAME\",\"description\":\"$DESCRIPTION\",\"visibility\":\"$VISIBILITY\",\"initialize_with_readme\":false}")
+    if [ "$HTTP_CODE" = "201" ]; then
+        printf "OK\n"
+    else
+        MSG=$(grep -o '"message":"[^"]*"' /tmp/newrepo_gl.json 2>/dev/null | head -1 | cut -d'"' -f4)
+        printf "FAILED (HTTP %s: %s)\n" "$HTTP_CODE" "$MSG"
+        rm -f /tmp/newrepo_gl.json
+        return 1
+    fi
+    rm -f /tmp/newrepo_gl.json
+}
+
+create_codeberg() {
+    printf "  Codeberg...  "
+    PRIVATE_VAL=$([ "$PRIVATE" = true ] && printf "true" || printf "false")
+    HTTP_CODE=$(curl -s -o /tmp/newrepo_cb.json -w "%{http_code}" \
+        -X POST \
+        -H "Authorization: token $CODEBERG_TOKEN" \
+        -H "Content-Type: application/json" \
+        https://codeberg.org/api/v1/user/repos \
+        -d "{\"name\":\"$REPO_NAME\",\"description\":\"$DESCRIPTION\",\"private\":$PRIVATE_VAL,\"auto_init\":false}")
+    if [ "$HTTP_CODE" = "201" ]; then
+        printf "OK\n"
+    else
+        MSG=$(grep -o '"message":"[^"]*"' /tmp/newrepo_cb.json 2>/dev/null | head -1 | cut -d'"' -f4)
+        printf "FAILED (HTTP %s: %s)\n" "$HTTP_CODE" "$MSG"
+        rm -f /tmp/newrepo_cb.json
+        return 1
+    fi
+    rm -f /tmp/newrepo_cb.json
+}
+
+create_bitbucket() {
+    printf "  Bitbucket... "
+    IS_PRIVATE=$([ "$PRIVATE" = true ] && printf "true" || printf "false")
+    HTTP_CODE=$(curl -s -o /tmp/newrepo_bb.json -w "%{http_code}" \
+        -X POST \
+        -u "$BITBUCKET_EMAIL:$BITBUCKET_API_TOKEN" \
+        -H "Content-Type: application/json" \
+        "https://api.bitbucket.org/2.0/repositories/$BITBUCKET_WORKSPACE/$REPO_NAME" \
+        -d "{\"scm\":\"git\",\"is_private\":$IS_PRIVATE,\"description\":\"$DESCRIPTION\"}")
+    if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+        printf "OK\n"
+    else
+        MSG=$(grep -o '"message":"[^"]*"' /tmp/newrepo_bb.json 2>/dev/null | head -1 | cut -d'"' -f4)
+        printf "FAILED (HTTP %s: %s)\n" "$HTTP_CODE" "$MSG"
+        rm -f /tmp/newrepo_bb.json
+        return 1
+    fi
+    rm -f /tmp/newrepo_bb.json
+}
+
+# All four must succeed — if any creation fails after a clean preflight something
+# has gone very wrong, so abort immediately rather than leave a partial state.
+create_github    || exit 1
+create_gitlab    || exit 1
+create_codeberg  || exit 1
+create_bitbucket || exit 1
+
+# --- Local git setup ---
+
+printf "\nInitializing local repository in '%s'...\n" "$REPO_PATH"
+cd "$REPO_PATH"
 git init
 git branch -M main
-git remote add origin git@bitbucket.org:jorisvdijk/$REPO_NAME.git
-git remote set-url --add --push origin git@bitbucket.org:jorisvdijk/$REPO_NAME.git
-git remote set-url --add --push origin git@github.com:jorisvandijk/$REPO_NAME.git
-git remote set-url --add --push origin git@gitlab.com:jorisvandijk/$REPO_NAME.git
-git remote set-url --add --push origin git@codeberg.org:jorisvandijk/$REPO_NAME.git
+git remote add origin git@bitbucket.org:jorisvdijk/"$REPO_NAME".git
+git remote set-url --add --push origin git@bitbucket.org:jorisvdijk/"$REPO_NAME".git
+git remote set-url --add --push origin git@github.com:jorisvandijk/"$REPO_NAME".git
+git remote set-url --add --push origin git@gitlab.com:jorisvandijk/"$REPO_NAME".git
+git remote set-url --add --push origin git@codeberg.org:jorisvandijk/"$REPO_NAME".git
 
-echo "Git repository initialized with multi-platform push setup"
-echo "Use 'git push origin main' after your first commit"
+printf "\nDone. Run 'git push origin main' after your first commit.\n"
