@@ -1,59 +1,27 @@
 #!/bin/bash
 
-REPOS_FILE="$HOME/.config/repos/repos"
+GIT_BASE_DIR="${HOME}/git"
 
-init_config() {
-    mkdir -p "$(dirname "$REPOS_FILE")"
-    touch "$REPOS_FILE"
-}
+if [[ -t 1 ]]; then
+    GREEN='\033[0;32m'
+    YELLOW='\033[0;33m'
+    RED='\033[0;31m'
+    NC='\033[0m'
+else
+    GREEN=''
+    YELLOW=''
+    RED=''
+    NC=''
+fi
 
-add_repo() {
-    local repo_path=$(realpath "$1" 2>/dev/null)
-    if [[ ! -d "$repo_path/.git" ]]; then
-        echo "Error: $1 is not a git repository"
-        exit 1
-    fi
-    
-    init_config
-    if grep -q "^$repo_path$" "$REPOS_FILE"; then
-        echo "Repository already tracked: $repo_path"
+classify_status() {
+    local status="$1"
+    if [[ "$status" == "clean" ]]; then
+        echo "clean"
+    elif [[ "$status" =~ (ahead|behind) ]]; then
+        echo "sync"
     else
-        echo "$repo_path" >> "$REPOS_FILE"
-        echo "Added: $repo_path"
-    fi
-}
-
-bulk_add() {
-    local base_dir=$(realpath "$1" 2>/dev/null)
-    if [[ ! -d "$base_dir" ]]; then
-        echo "Error: Directory does not exist: $1"
-        exit 1
-    fi
-    
-    init_config
-    for dir in "$base_dir"/*; do
-        if [[ -d "$dir/.git" ]]; then
-            local repo_path=$(realpath "$dir")
-            if ! grep -q "^$repo_path$" "$REPOS_FILE"; then
-                echo "$repo_path" >> "$REPOS_FILE"
-                echo "Added: $repo_path"
-            fi
-        fi
-    done
-}
-
-remove_repo() {
-    local repo_path=$(realpath "$1" 2>/dev/null)
-    if [[ -z "$repo_path" ]]; then
-        repo_path="$1"
-    fi
-    init_config
-    if grep -q "^$repo_path$" "$REPOS_FILE"; then
-        grep -v "^$repo_path$" "$REPOS_FILE" > "$REPOS_FILE.tmp"
-        mv "$REPOS_FILE.tmp" "$REPOS_FILE"
-        echo "Removed: $repo_path"
-    else
-        echo "Repository not found in tracking list: $repo_path"
+        echo "dirty"
     fi
 }
 
@@ -100,58 +68,68 @@ get_repo_status() {
 }
 
 list_repos() {
-    init_config
-    if [[ ! -s "$REPOS_FILE" ]]; then
-        echo "No repositories tracked. Use 'repos add <repo>' to add some."
+    if [[ ! -d "$GIT_BASE_DIR" ]]; then
+        echo "Error: Git directory does not exist: $GIT_BASE_DIR"
+        exit 1
+    fi
+
+    local sync_entries=()
+    local dirty_entries=()
+    local clean_entries=()
+
+    for repo_dir in "$GIT_BASE_DIR"/*; do
+        if [[ -d "$repo_dir/.git" ]]; then
+            local repo_name=$(basename "$repo_dir")
+            local repo_status=$(get_repo_status "$repo_dir")
+            local classification=$(classify_status "$repo_status")
+
+            case "$classification" in
+                sync)
+                    sync_entries+=("$repo_name|$repo_status")
+                    ;;
+                dirty)
+                    dirty_entries+=("$repo_name|$repo_status")
+                    ;;
+                clean)
+                    clean_entries+=("$repo_name|$repo_status")
+                    ;;
+            esac
+        fi
+    done
+
+    local total=$((${#sync_entries[@]} + ${#dirty_entries[@]} + ${#clean_entries[@]}))
+    if [[ $total -eq 0 ]]; then
+        echo "No git repositories found in: $GIT_BASE_DIR"
         exit 0
     fi
-    
-    while IFS= read -r repo_path; do
-        local repo_status=$(get_repo_status "$repo_path")
-        printf "%-50s %s\n" "$repo_path" "$repo_status"
-    done < "$REPOS_FILE"
+
+    for entry in "${sync_entries[@]}"; do
+        local name="${entry%|*}"
+        local status="${entry#*|}"
+        printf "${RED}%-20s ${status}${NC}\n" "$name"
+    done
+
+    for entry in "${dirty_entries[@]}"; do
+        local name="${entry%|*}"
+        local status="${entry#*|}"
+        printf "${YELLOW}%-20s ${status}${NC}\n" "$name"
+    done
+
+    for entry in "${clean_entries[@]}"; do
+        local name="${entry%|*}"
+        local status="${entry#*|}"
+        printf "${GREEN}%-20s ${status}${NC}\n" "$name"
+    done
 }
 
 show_usage() {
-    echo "Usage: repos [command] [options]"
-    echo "Commands:"
-    echo "  add <repo>     Add a git repository to tracking"
-    echo "  add -r <dir>   Bulk add all git repos in directory"
-    echo "  remove <repo>  Remove a repository from tracking"
-    echo "  (no args)      List and select repositories with fzf"
+    echo "Usage: repos"
+    echo "Lists all git repositories in: $GIT_BASE_DIR"
 }
 
-case "$1" in
-    "add")
-        if [[ "$2" == "-r" ]]; then
-            if [[ -z "$3" ]]; then
-                echo "Error: Please specify directory for bulk add"
-                show_usage
-                exit 1
-            fi
-            bulk_add "$3"
-        elif [[ -n "$2" ]]; then
-            add_repo "$2"
-        else
-            echo "Error: Please specify repository path"
-            show_usage
-            exit 1
-        fi
-        ;;
-    "remove")
-        if [[ -n "$2" ]]; then
-            remove_repo "$2"
-        else
-            echo "Error: Please specify repository path"
-            show_usage
-            exit 1
-        fi
-        ;;
-    "")
-        list_repos
-        ;;
-    *)
-        show_usage
-        exit 1
-        ;;
-esac
+if [[ -n "$1" ]]; then
+    show_usage
+    exit 1
+fi
+
+list_repos
