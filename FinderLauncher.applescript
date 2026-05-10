@@ -1,0 +1,13 @@
+#!/usr/bin/osascript
+
+# @raycast.schemaVersion 1
+# @raycast.title Open Finder
+# @raycast.mode silent
+# @raycast.packageName Navigation
+
+tell application "Finder"
+	activate
+	if (count of Finder windows) is 0 then
+		make new Finder window to home
+	end if
+end tell
