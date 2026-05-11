@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# @raycast.schemaVersion 1
+# @raycast.title Morrowind
+# @raycast.mode silent
+# @raycast.icon 🎮
+# @raycast.packageName Games
+
+open -a /Applications/OpenMW.app

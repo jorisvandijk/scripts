@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# @raycast.schemaVersion 1
+# @raycast.title Fallout 2
+# @raycast.mode silent
+# @raycast.icon 🎮
+# @raycast.packageName Games
+
+cd ~/Games/Fallout2 && exec ./Fallout\ II\ Community\ Edition.app/Contents/MacOS/fallout2-ce

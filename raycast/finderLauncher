@@ -4,6 +4,7 @@
 # @raycast.title Open Finder
 # @raycast.mode silent
 # @raycast.packageName Navigation
+# @raycast.icon 📁
 
 tell application "Finder"
 	activate

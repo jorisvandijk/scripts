@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# @raycast.schemaVersion 1
+# @raycast.title Quake: Dimension of the Past
+# @raycast.mode silent
+# @raycast.icon 🔫
+# @raycast.packageName Games
+
+open -a ~/Games/Quake/vkQuake.app --args -basedir ~/Games/Quake -game dopa
