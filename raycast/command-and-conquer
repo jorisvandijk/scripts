@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Required parameters:
+# @raycast.schemaVersion 1
+# @raycast.title Command & Conquer
+# @raycast.mode silent
+
+# Optional parameters:
+# @raycast.icon 🎖️
+# @raycast.packageName Games
+
+open -a "OpenRA - Tiberian Dawn"
