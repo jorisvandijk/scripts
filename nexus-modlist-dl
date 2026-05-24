@@ -1,0 +1,358 @@
+#!/usr/bin/env bash
+#
+# nexus-modlist-dl — download a Skyrim/Nexus modlist via the Nexus public API
+#
+# Usage:
+#   nexus-modlist-dl <modlist.md> [target-dir]
+#
+# Defaults:
+#   target-dir = ~/Downloads/skyrim-mods
+#
+# Config:
+#   ~/.config/nexus-modlist-dl/config  (mode 0600)
+#     NEXUS_API_KEY="..."
+#
+# Get an API key here:
+#   https://next.nexusmods.com/settings/api-keys
+#
+# Requires: bash 4+, curl, jq
+#
+
+set -euo pipefail
+
+# --- constants ---------------------------------------------------------------
+
+readonly APP_NAME="nexus-modlist-dl"
+readonly APP_VERSION="1.0.0"
+readonly API_BASE="https://api.nexusmods.com/v1"
+readonly CONFIG_FILE="${HOME}/.config/nexus-modlist-dl/config"
+readonly DEFAULT_TARGET="${HOME}/Downloads/skyrim-mods"
+
+# Throttling: one request per second is well under the 600/hour premium quota
+# (see node-nexus-api Quota implementation: burst 30, recover 1/sec).
+readonly REQUEST_DELAY_SECONDS=1
+
+# --- defaults / flags --------------------------------------------------------
+
+INCLUDE_OPTIONAL=0
+DRY_RUN=0
+MODLIST=""
+TARGET_DIR=""
+
+# --- helpers -----------------------------------------------------------------
+
+log()   { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*" >&2; }
+warn()  { printf '[%s] WARN: %s\n' "$(date +%H:%M:%S)" "$*" >&2; }
+fatal() { printf '[%s] FATAL: %s\n' "$(date +%H:%M:%S)" "$*" >&2; exit 1; }
+
+usage() {
+    cat <<EOF
+Usage: ${APP_NAME} [options] <modlist.md> [target-dir]
+
+Downloads all Nexus Mods entries from a markdown modlist file.
+Parses Nexus URLs of the form: https://www.nexusmods.com/<game>/mods/<id>
+
+Options:
+  --include-optional   Also download files in the OPTIONAL category
+                       (default: MAIN files only)
+  --dry-run            Resolve everything but do not download
+  -h, --help           Show this help
+
+Config file: ${CONFIG_FILE}
+Required: NEXUS_API_KEY="..."
+EOF
+    exit 0
+}
+
+# --- arg parsing -------------------------------------------------------------
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --include-optional) INCLUDE_OPTIONAL=1; shift ;;
+        --dry-run)          DRY_RUN=1; shift ;;
+        -h|--help)          usage ;;
+        -*)                 fatal "unknown option: $1" ;;
+        *)
+            if [[ -z "${MODLIST}" ]]; then
+                MODLIST="$1"
+            elif [[ -z "${TARGET_DIR}" ]]; then
+                TARGET_DIR="$1"
+            else
+                fatal "unexpected argument: $1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+[[ -n "${MODLIST}" ]]      || fatal "no modlist file given. See --help."
+[[ -f "${MODLIST}" ]]      || fatal "modlist not found: ${MODLIST}"
+TARGET_DIR="${TARGET_DIR:-${DEFAULT_TARGET}}"
+
+# --- preflight ---------------------------------------------------------------
+
+command -v curl >/dev/null || fatal "curl not found"
+command -v jq   >/dev/null || fatal "jq not found"
+
+[[ -f "${CONFIG_FILE}" ]] || fatal "missing config: ${CONFIG_FILE}
+Create it with:
+  mkdir -p $(dirname "${CONFIG_FILE}")
+  echo 'NEXUS_API_KEY=\"your-key-here\"' > ${CONFIG_FILE}
+  chmod 600 ${CONFIG_FILE}"
+
+# shellcheck source=/dev/null
+source "${CONFIG_FILE}"
+[[ -n "${NEXUS_API_KEY:-}" ]] || fatal "NEXUS_API_KEY not set in ${CONFIG_FILE}"
+
+mkdir -p "${TARGET_DIR}"
+
+# --- api wrapper -------------------------------------------------------------
+
+# api_get <path>
+# Returns body on stdout. Exits non-zero on HTTP error.
+# Captures rate-limit headers from the response.
+api_get() {
+    local path="$1"
+    local url="${API_BASE}${path}"
+    local tmp_headers tmp_body http_code
+    tmp_headers=$(mktemp)
+    tmp_body=$(mktemp)
+
+    http_code=$(curl -sS \
+        -w '%{http_code}' \
+        -o "${tmp_body}" \
+        -D "${tmp_headers}" \
+        -H "apikey: ${NEXUS_API_KEY}" \
+        -H "Application-Name: ${APP_NAME}" \
+        -H "Application-Version: ${APP_VERSION}" \
+        -H "Accept: application/json" \
+        "${url}")
+
+    local hourly daily
+    hourly=$(awk 'BEGIN{IGNORECASE=1} /^x-rl-hourly-remaining:/ {gsub(/\r/,""); print $2}' "${tmp_headers}" | tail -n1)
+    daily=$( awk 'BEGIN{IGNORECASE=1} /^x-rl-daily-remaining:/  {gsub(/\r/,""); print $2}' "${tmp_headers}" | tail -n1)
+    [[ -n "${hourly}" ]] && API_HOURLY_REMAINING="${hourly}"
+    [[ -n "${daily}"  ]] && API_DAILY_REMAINING="${daily}"
+
+    if [[ "${http_code}" != "200" ]]; then
+        local msg
+        msg=$(jq -r '.message // .error // empty' < "${tmp_body}" 2>/dev/null || true)
+        rm -f "${tmp_headers}" "${tmp_body}"
+        printf 'HTTP %s: %s\n' "${http_code}" "${msg:-no message}" >&2
+        return 1
+    fi
+
+    cat "${tmp_body}"
+    rm -f "${tmp_headers}" "${tmp_body}"
+}
+
+# --- validate key ------------------------------------------------------------
+
+log "validating API key…"
+validate_response=$(api_get "/users/validate.json") || fatal "API key validation failed"
+
+is_premium=$(jq -r '.is_premium' <<< "${validate_response}")
+user_name=$( jq -r '.name'       <<< "${validate_response}")
+
+if [[ "${is_premium}" != "true" ]]; then
+    fatal "this account is not premium — direct download links require premium membership.
+The free-tier API requires a per-download key generated by clicking 'Download with Manager' on the website,
+which defeats the point of this script."
+fi
+
+log "authenticated as ${user_name} (premium)"
+log "rate limit remaining: ${API_HOURLY_REMAINING:-?} hourly / ${API_DAILY_REMAINING:-?} daily"
+
+# --- parse modlist -----------------------------------------------------------
+
+log "parsing modlist: ${MODLIST}"
+
+# Extract markdown links pointing at nexusmods.com mod pages.
+# Format expected: https://www.nexusmods.com/<game>/mods/<id>
+# We capture: name (link text), game (domain segment), mod_id.
+
+mapfile -t mod_entries < <(
+    grep -oE '\[[^]]+\]\(https://www\.nexusmods\.com/[a-zA-Z0-9_-]+/mods/[0-9]+\)' "${MODLIST}" \
+        | sed -E 's#\[([^]]+)\]\(https://www\.nexusmods\.com/([a-zA-Z0-9_-]+)/mods/([0-9]+)\)#\1|\2|\3#'
+)
+
+# Also flag non-Nexus links so the user knows what was skipped.
+mapfile -t external_entries < <(
+    grep -oE '\[[^]]+\]\(https?://[^)]+\)' "${MODLIST}" \
+        | grep -Ev '\(https://www\.nexusmods\.com/[a-zA-Z0-9_-]+/mods/[0-9]+\)' \
+        | sed -E 's#\[([^]]+)\]\(([^)]+)\)#\1 -> \2#' \
+        || true
+)
+
+total_mods=${#mod_entries[@]}
+[[ ${total_mods} -gt 0 ]] || fatal "no Nexus mod links found in ${MODLIST}"
+
+log "found ${total_mods} Nexus mod link(s)"
+if [[ ${#external_entries[@]} -gt 0 ]]; then
+    log "non-Nexus links (will be skipped, download these manually):"
+    for e in "${external_entries[@]}"; do
+        printf '   - %s\n' "$e" >&2
+    done
+fi
+
+# Confirmation prompt
+echo >&2
+read -r -p "Proceed? [y/N] " confirm
+[[ "${confirm,,}" == "y" || "${confirm,,}" == "yes" ]] || { log "aborted by user"; exit 0; }
+
+# --- main loop ---------------------------------------------------------------
+
+declare -i downloaded=0 skipped_existing=0 failed=0 no_files=0 idx=0
+
+# Failure tracking for end-of-run report
+declare -a failures=()
+
+for entry in "${mod_entries[@]}"; do
+    idx+=1
+    IFS='|' read -r name game mod_id <<< "${entry}"
+
+    printf '\n' >&2
+    log "[${idx}/${total_mods}] ${name} (${game}/${mod_id})"
+
+    # 1. Get the file list
+    sleep "${REQUEST_DELAY_SECONDS}"
+    if ! files_json=$(api_get "/games/${game}/mods/${mod_id}/files.json"); then
+        warn "  failed to list files"
+        failed+=1
+        failures+=("${name}: file list failed")
+        continue
+    fi
+
+    # 2. Pick which files to download
+    if [[ ${INCLUDE_OPTIONAL} -eq 1 ]]; then
+        category_filter='.category_name == "MAIN" or .category_name == "OPTIONAL"'
+    else
+        category_filter='.category_name == "MAIN"'
+    fi
+
+    mapfile -t selected < <(
+        jq -r --argjson dummy 0 \
+            ".files | map(select(${category_filter})) | .[] | \"\(.file_id)|\(.file_name)|\(.category_name)\"" \
+            <<< "${files_json}"
+    )
+
+    if [[ ${#selected[@]} -eq 0 ]]; then
+        warn "  no MAIN files found — author may have categorized differently. Inspect manually."
+        no_files+=1
+        failures+=("${name}: no MAIN files (visit page)")
+        continue
+    fi
+
+    log "  ${#selected[@]} file(s) selected:"
+    for f in "${selected[@]}"; do
+        IFS='|' read -r fid fname fcat <<< "$f"
+        printf '     - [%s] %s\n' "${fcat}" "${fname}" >&2
+    done
+
+    # 3. For each selected file: resolve download URL and fetch
+    for f in "${selected[@]}"; do
+        IFS='|' read -r fid fname fcat <<< "$f"
+        out_path="${TARGET_DIR}/${fname}"
+
+        # Skip if already present and non-empty.
+        # (Not size-verified — Nexus doesn't return file size in the link response,
+        # and re-resolving every file just to check would waste quota. If you want
+        # to force re-download, delete the file.)
+        if [[ -f "${out_path}" && -s "${out_path}" ]]; then
+            log "  already exists, skipping: ${fname}"
+            skipped_existing+=1
+            continue
+        fi
+
+        if [[ ${DRY_RUN} -eq 1 ]]; then
+            log "  [dry-run] would download: ${fname}"
+            continue
+        fi
+
+        sleep "${REQUEST_DELAY_SECONDS}"
+        if ! link_json=$(api_get "/games/${game}/mods/${mod_id}/files/${fid}/download_link.json"); then
+            warn "  download link request failed for ${fname}"
+            failed+=1
+            failures+=("${name} / ${fname}: link request failed")
+            continue
+        fi
+
+        # The endpoint returns an array of CDN mirrors. First entry is usually fine.
+        download_url=$(jq -r '.[0].URI' <<< "${link_json}")
+        cdn_name=$(   jq -r '.[0].name // "?"' <<< "${link_json}")
+
+        if [[ -z "${download_url}" || "${download_url}" == "null" ]]; then
+            warn "  empty download URL for ${fname}"
+            failed+=1
+            failures+=("${name} / ${fname}: empty download URL")
+            continue
+        fi
+
+        # Nexus serves URIs with literal spaces and parens in the path (e.g.
+        # "All in one (all game versions)-32444-11-...zip"). Newer curl rejects
+        # these with "Malformed input to a URL function". URL-encode the path
+        # portion (everything before the '?' query string) so curl accepts it.
+        # The query string params (md5, expires, user_id) are already safe.
+        # Split URL into base#path?query, encode only the path portion.
+        if [[ "${download_url}" == *"?"* ]]; then
+            url_base="${download_url%%\?*}"
+            url_query="?${download_url#*\?}"
+        else
+            url_base="${download_url}"
+            url_query=""
+        fi
+        # Replace spaces with %20, ( with %28, ) with %29. These are the only
+        # offending characters Nexus puts in path components.
+        url_base_enc="${url_base// /%20}"
+        url_base_enc="${url_base_enc//\(/%28}"
+        url_base_enc="${url_base_enc//\)/%29}"
+        encoded_url="${url_base_enc}${url_query}"
+
+        log "  downloading from ${cdn_name}…"
+        # -L follow redirects, -C - resume if partial, --fail to error on HTTP 4xx/5xx
+        if curl -fL -C - --progress-bar -o "${out_path}" "${encoded_url}"; then
+            log "  done: ${fname}"
+            downloaded+=1
+        else
+            warn "  download failed for ${fname}"
+            failed+=1
+            failures+=("${name} / ${fname}: curl exit non-zero")
+            # Leave partial file in place so -C - can resume on next run.
+        fi
+    done
+
+    log "  rate limit remaining: ${API_HOURLY_REMAINING:-?} hourly / ${API_DAILY_REMAINING:-?} daily"
+done
+
+# --- summary -----------------------------------------------------------------
+
+cat >&2 <<EOF
+
+================================================================
+  Summary
+================================================================
+  Mods processed:         ${total_mods}
+  Files downloaded:       ${downloaded}
+  Files already present:  ${skipped_existing}
+  Mods with no MAIN file: ${no_files}
+  Failures:               ${failed}
+  Target directory:       ${TARGET_DIR}
+EOF
+
+if [[ ${#failures[@]} -gt 0 ]]; then
+    echo "" >&2
+    echo "  Failures / manual review:" >&2
+    for f in "${failures[@]}"; do
+        printf '    - %s\n' "$f" >&2
+    done
+fi
+
+if [[ ${#external_entries[@]} -gt 0 ]]; then
+    echo "" >&2
+    echo "  Reminder — non-Nexus links to fetch manually:" >&2
+    for e in "${external_entries[@]}"; do
+        printf '    - %s\n' "$e" >&2
+    done
+fi
+
+echo "" >&2
