@@ -1,7 +1,7 @@
 # Scripts
 
 Personal CLI toolset for macOS (primary) and Linux. Every script is named
-`j<CapitalWord>` (e.g. `jPush`, `jExtract`). A single central script — `j` —
+`j<CapitalWord>` (e.g. `jPush`, `jExtract`). A single central script — `j` -
 acts as shared library and management CLI. No symlinks, no dispatchers.
 
 ---
@@ -38,6 +38,16 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 | `j::version "$0"` | Print line 2 of the calling script's header |
 | `j::help "jName"` | Print the HELP section from `man/jName.txt` |
 | `j::show_man "jName"` | Open `man/jName.txt` in `$PAGER` |
+
+### Coloring text
+Colors used in warning can also be used directly by any script:
+
+|Color | Code |
+|---|---|
+| Red | ${J_RED} |
+| Green | ${J_GREEN} |
+| Yellow | ${J_YELLOW} |
+| Color reset | ${J_RESET} |
 
 ### CLI commands
 
