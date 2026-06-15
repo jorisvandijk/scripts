@@ -1,0 +1,22 @@
+NAME
+    jPush — stage, commit, and push to Git
+
+SYNOPSIS
+    jPush [options]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+jPush stages all changes in the current repository, displays git status, then
+prompts for a commit message. After committing it pushes to the remote. If no
+upstream branch is configured for the current branch it sets one automatically
+with --set-upstream origin <branch>. Pressing Ctrl-C at any point unstages
+the changes and leaves the working directory intact.
+
+EXAMPLES
+
+    jPush
+        Stage everything, enter a commit message interactively, and push.

@@ -1,0 +1,29 @@
+NAME
+    j — jScripts shared library and CLI tooling
+
+SYNOPSIS
+    j <command> [args]
+
+    Commands:
+      list              List all available jScripts with descriptions
+      version <script>  Print the version of a script
+      man <script>      Open the man page for a script in $PAGER
+
+DESCRIPTION
+
+j is both a shared Bash library (sourced by every jScript) and a standalone
+CLI for managing the collection. As a library it provides coloured logging
+helpers (j::info, j::warn, j::error, j::die), version extraction, and man
+page display. As a CLI it lets you discover, inspect, and read documentation
+for any script in the collection.
+
+EXAMPLES
+
+    j list
+        Print all available jScripts with their one-line descriptions.
+
+    j version jPush
+        Print the version string of jPush.
+
+    j man jNewRepo
+        Open the jNewRepo man page in the configured pager.

@@ -1,0 +1,22 @@
+NAME
+    jRepos — show git status of all repositories
+
+SYNOPSIS
+    jRepos [options]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+jRepos scans every subdirectory of ~/git that contains a .git directory and
+reports its status in a colour-coded table. Repositories that are ahead of or
+behind their remote are shown in red, those with uncommitted changes in yellow,
+and clean repositories in green. Each row shows the repo name alongside a
+human-readable summary (staged, modified, untracked, ahead N, behind N).
+
+EXAMPLES
+
+    jRepos
+        Print the status table for all git repositories in ~/git.

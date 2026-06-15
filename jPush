@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+#	jPush 2.2
+#	Stage, commit, and push to Git
+#	Dependencies: git
+#	Usage: jPush
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jPush" && exit 0
+
+cleanup() {
+    j::warn "Undoing staged changes..."
+    git reset &>/dev/null || true
+    j::warn "Changes have been unstaged. Working directory left intact."
+    exit 1
+}
+
+trap cleanup INT
+
+j::info "Staging changes..."
+git add . || { j::error "Failed to stage changes."; exit 1; }
+j::info "Changes staged successfully."
+
+j::info "Git status:"
+git status
+
+echo
+printf "${J_YELLOW}Enter commit message (or press Ctrl+C to cancel): ${J_RESET}"
+read -r commit_msg
+
+[[ -z "$commit_msg" ]] && j::warn "Commit message cannot be empty." && cleanup
+
+j::info "Committing changes..."
+git commit -m "$commit_msg" || { j::error "Commit failed."; cleanup; }
+j::info "Changes committed successfully."
+
+j::info "Pushing changes..."
+if git push; then
+    j::info "Changes committed and pushed successfully."
+    exit 0
+fi
+
+j::warn "Push failed. Checking if upstream branch is missing..."
+current_branch="$(git rev-parse --abbrev-ref HEAD)"
+[[ -z "$current_branch" ]] && j::error "Unable to determine current branch." && cleanup
+
+j::warn "No upstream branch set for '${current_branch}'. Setting upstream..."
+if git push --set-upstream origin "$current_branch"; then
+    j::info "Upstream set and changes pushed."
+else
+    j::error "Failed to push after setting upstream."
+    cleanup
+fi

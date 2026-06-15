@@ -1,0 +1,31 @@
+NAME
+    jList — enhanced directory listing
+
+SYNOPSIS
+    jList [options] [eza-args]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+      -a, --all       Include hidden files and dotfiles
+
+    Any additional argument is forwarded directly to eza.
+
+DESCRIPTION
+
+jList is an opinionated wrapper around eza that enables long format, binary
+file sizes, column headers, always-on colour, git status per file, git repo
+summary, icons, terminal hyperlinks, and ISO-style timestamps. When run in
+the home directory without --all, common noise directories (Music, Movies,
+Pictures, Applications, Desktop, Library) are hidden automatically.
+
+EXAMPLES
+
+    jList
+        List the current directory with all enhancements.
+
+    jList -a
+        Include hidden files and dotfiles in the listing.
+
+    jList ~/Downloads
+        List a specific directory.

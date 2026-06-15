@@ -1,0 +1,21 @@
+NAME
+    jOpenFzf — interactively select and open files
+
+SYNOPSIS
+    jOpenFzf [options]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+jOpenFzf launches fzf from the home directory with a bat-powered syntax-
+highlighted preview pane, allowing multiple files to be selected. All selected
+files are opened together in micro. If no files are selected (Escape or
+Ctrl-C), the script exits silently.
+
+EXAMPLES
+
+    jOpenFzf
+        Browse all files under ~ with preview; open the selection in micro.

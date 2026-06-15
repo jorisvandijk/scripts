@@ -1,39 +1,16 @@
-#!/bin/sh
-# NewRepo - Initialize a local git repo and create it on all four platforms
-# Usage: NewRepo [--private] [--desc "description"] REPO_NAME REPO_PATH
+#!/usr/bin/env bash
+#	jNewRepo 2.0
+#	Initialize a local git repo and create it on GitHub, GitLab, Codeberg, and Bitbucket
+#	Dependencies: git, curl
+#	Usage: jNewRepo [--private] [--desc "description"] REPO_NAME REPO_PATH
 #
-# =============================================================================
-# INSTALL
-#
-# 1. Install the script:
-#      chmod +x NewRepo
-#      mv NewRepo ~/.local/bin/NewRepo
-#
-# 2. Create the config file:
-#      mkdir -p ~/git/documents/newrepo
-#      touch ~/git/documents/newrepo/config
-#      chmod 600 ~/git/documents/newrepo/config
-#
-# 3. Populate ~/git/documents/newrepo/config (quote all values):
-#      GITHUB_TOKEN="your_token_here"
-#      GITLAB_TOKEN="your_token_here"
-#      CODEBERG_TOKEN="your_token_here"
-#      BITBUCKET_WORKSPACE="jorisvdijk"
-#      BITBUCKET_EMAIL="your_atlassian_email_here"
-#      BITBUCKET_API_TOKEN="your_api_token_here"
-#
-# 4. Token scopes needed:
-#      GitHub:    Settings → Developer settings → Personal access tokens  (repo)
-#      GitLab:    Preferences → Access tokens                             (api)
-#      Codeberg:  Settings → Applications → Access tokens                 (read:user + write:repository)
-#      Bitbucket: id.atlassian.com → Security → API tokens               (Repositories: read+write)
-#
-# USAGE
-#
-#   NewRepo REPO_NAME REPO_PATH
-#   NewRepo --private REPO_NAME REPO_PATH
-#   NewRepo --private --desc "A short description" REPO_NAME REPO_PATH
-# =============================================================================
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jNewRepo" && exit 0
 
 PRIVATE=false
 DESCRIPTION=""
@@ -43,15 +20,12 @@ while [ $# -gt 0 ]; do
         --private) PRIVATE=true; shift ;;
         --desc)    DESCRIPTION="$2"; shift 2 ;;
         --)        shift; break ;;
-        -*)        printf "Unknown option: %s\n" "$1"; exit 1 ;;
+        -*)        j::die "unknown option: $1" ;;
         *)         break ;;
     esac
 done
 
-if [ $# -ne 2 ]; then
-    printf "Usage: %s [--private] [--desc 'description'] REPO_NAME REPO_PATH\n" "$0"
-    exit 1
-fi
+[ $# -ne 2 ] && j::die "usage: jNewRepo [--private] [--desc 'description'] REPO_NAME REPO_PATH"
 
 REPO_NAME="$1"
 REPO_PATH="$2"
@@ -81,118 +55,112 @@ fi
 # shellcheck source=/dev/null
 . "$CONFIG_FILE"
 
-# --- Local path checks (before any network calls) ---
+[ ! -d "$REPO_PATH" ]      && j::die "directory '$REPO_PATH' does not exist"
+[ -d "$REPO_PATH/.git" ]   && j::die "'$REPO_PATH' already has a .git directory"
 
-if [ ! -d "$REPO_PATH" ]; then
-    printf "Error: Directory '%s' does not exist\n" "$REPO_PATH"
-    exit 1
-fi
-
-if [ -d "$REPO_PATH/.git" ]; then
-    printf "Error: '%s' already has a .git directory\n" "$REPO_PATH"
-    exit 1
-fi
-
-# --- Preflight checks ---
-# Validates credentials and confirms the repo name is available on every platform.
-# ALL four must pass before anything is created.
+# ── Preflight checks ─────────────────────────────────────────────────────────
 
 PREFLIGHT_FAILED=false
 
-check_github() {
-    printf "  GitHub...    "
-    AUTH=$(curl -s -o /dev/null -w "%{http_code}" \
+check_auth_github() {
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" \
         -H "Authorization: Bearer $GITHUB_TOKEN" \
         -H "Accept: application/vnd.github+json" \
         https://api.github.com/user)
-    if [ "$AUTH" != "200" ]; then
-        printf "FAIL (invalid token, HTTP %s)\n" "$AUTH"; return 1
-    fi
-    EXIST=$(curl -s -o /dev/null -w "%{http_code}" \
+    [ "$code" = "200" ] && return 0
+    printf "  GitHub auth...   FAIL (invalid token, HTTP %s)\n" "$code"; return 1
+}
+
+check_exists_github() {
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" \
         -H "Authorization: Bearer $GITHUB_TOKEN" \
         -H "Accept: application/vnd.github+json" \
         "https://api.github.com/repos/jorisvandijk/$REPO_NAME")
-    if [ "$EXIST" = "200" ]; then
-        printf "FAIL (repo already exists)\n"; return 1
-    elif [ "$EXIST" = "404" ]; then
-        printf "OK\n"; return 0
-    else
-        printf "FAIL (unexpected HTTP %s)\n" "$EXIST"; return 1
-    fi
+    case "$code" in
+        404) printf "  GitHub repo...   OK\n"; return 0 ;;
+        200) printf "  GitHub repo...   FAIL (already exists)\n"; return 1 ;;
+        *)   printf "  GitHub repo...   FAIL (unexpected HTTP %s)\n" "$code"; return 1 ;;
+    esac
 }
 
-check_gitlab() {
-    printf "  GitLab...    "
-    AUTH=$(curl -s -o /dev/null -w "%{http_code}" \
+check_auth_gitlab() {
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" \
         -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
         https://gitlab.com/api/v4/user)
-    if [ "$AUTH" != "200" ]; then
-        printf "FAIL (invalid token, HTTP %s)\n" "$AUTH"; return 1
-    fi
-    EXIST=$(curl -s -o /dev/null -w "%{http_code}" \
+    [ "$code" = "200" ] && return 0
+    printf "  GitLab auth...   FAIL (invalid token, HTTP %s)\n" "$code"; return 1
+}
+
+check_exists_gitlab() {
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" \
         -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
         "https://gitlab.com/api/v4/projects/jorisvandijk%2F$REPO_NAME")
-    if [ "$EXIST" = "200" ]; then
-        printf "FAIL (repo already exists)\n"; return 1
-    elif [ "$EXIST" = "404" ]; then
-        printf "OK\n"; return 0
-    else
-        printf "FAIL (unexpected HTTP %s)\n" "$EXIST"; return 1
-    fi
+    case "$code" in
+        404) printf "  GitLab repo...   OK\n"; return 0 ;;
+        200) printf "  GitLab repo...   FAIL (already exists)\n"; return 1 ;;
+        *)   printf "  GitLab repo...   FAIL (unexpected HTTP %s)\n" "$code"; return 1 ;;
+    esac
 }
 
-check_codeberg() {
-    printf "  Codeberg...  "
-    AUTH=$(curl -s -o /dev/null -w "%{http_code}" \
+check_auth_codeberg() {
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" \
         -H "Authorization: token $CODEBERG_TOKEN" \
         https://codeberg.org/api/v1/user)
-    if [ "$AUTH" != "200" ]; then
-        printf "FAIL (invalid token, HTTP %s)\n" "$AUTH"; return 1
-    fi
-    EXIST=$(curl -s -o /dev/null -w "%{http_code}" \
-        -H "Authorization: token $CODEBERG_TOKEN" \
-        "https://codeberg.org/api/v1/repos/jorisvandijk/$REPO_NAME")
-    if [ "$EXIST" = "200" ]; then
-        printf "FAIL (repo already exists)\n"; return 1
-    elif [ "$EXIST" = "404" ]; then
-        printf "OK\n"; return 0
-    else
-        printf "FAIL (unexpected HTTP %s)\n" "$EXIST"; return 1
-    fi
+    [ "$code" = "200" ] && return 0
+    printf "  Codeberg auth... FAIL (invalid token, HTTP %s)\n" "$code"; return 1
 }
 
-check_bitbucket() {
-    printf "  Bitbucket... "
-    AUTH=$(curl -s -o /dev/null -w "%{http_code}" \
+check_exists_codeberg() {
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: token $CODEBERG_TOKEN" \
+        "https://codeberg.org/api/v1/repos/jorisvandijk/$REPO_NAME")
+    case "$code" in
+        404) printf "  Codeberg repo... OK\n"; return 0 ;;
+        200) printf "  Codeberg repo... FAIL (already exists)\n"; return 1 ;;
+        *)   printf "  Codeberg repo... FAIL (unexpected HTTP %s)\n" "$code"; return 1 ;;
+    esac
+}
+
+check_auth_bitbucket() {
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" \
         -u "$BITBUCKET_EMAIL:$BITBUCKET_API_TOKEN" \
         https://api.bitbucket.org/2.0/user)
-    if [ "$AUTH" != "200" ]; then
-        printf "FAIL (invalid credentials, HTTP %s)\n" "$AUTH"; return 1
-    fi
-    EXIST=$(curl -s -o /dev/null -w "%{http_code}" \
+    [ "$code" = "200" ] && return 0
+    printf "  Bitbucket auth...FAIL (invalid credentials, HTTP %s)\n" "$code"; return 1
+}
+
+check_exists_bitbucket() {
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" \
         -u "$BITBUCKET_EMAIL:$BITBUCKET_API_TOKEN" \
         "https://api.bitbucket.org/2.0/repositories/$BITBUCKET_WORKSPACE/$REPO_NAME")
-    if [ "$EXIST" = "200" ]; then
-        printf "FAIL (repo already exists)\n"; return 1
-    elif [ "$EXIST" = "404" ]; then
-        printf "OK\n"; return 0
-    else
-        printf "FAIL (unexpected HTTP %s)\n" "$EXIST"; return 1
-    fi
+    case "$code" in
+        404) printf "  Bitbucket repo...OK\n"; return 0 ;;
+        200) printf "  Bitbucket repo...FAIL (already exists)\n"; return 1 ;;
+        *)   printf "  Bitbucket repo...FAIL (unexpected HTTP %s)\n" "$code"; return 1 ;;
+    esac
 }
 
 printf "Preflight checks for '%s'...\n" "$REPO_NAME"
-check_github    || PREFLIGHT_FAILED=true
-check_gitlab    || PREFLIGHT_FAILED=true
-check_codeberg  || PREFLIGHT_FAILED=true
-check_bitbucket || PREFLIGHT_FAILED=true
+check_auth_github    || PREFLIGHT_FAILED=true
+check_exists_github  || PREFLIGHT_FAILED=true
+check_auth_gitlab    || PREFLIGHT_FAILED=true
+check_exists_gitlab  || PREFLIGHT_FAILED=true
+check_auth_codeberg  || PREFLIGHT_FAILED=true
+check_exists_codeberg  || PREFLIGHT_FAILED=true
+check_auth_bitbucket || PREFLIGHT_FAILED=true
+check_exists_bitbucket || PREFLIGHT_FAILED=true
 
-if [ "$PREFLIGHT_FAILED" = true ]; then
-    printf "\nPreflight failed. Nothing was created.\n"
-    exit 1
-fi
+[ "$PREFLIGHT_FAILED" = true ] && printf "\nPreflight failed. Nothing was created.\n" && exit 1
 
-# --- Create on all platforms ---
+# ── Create on all platforms ───────────────────────────────────────────────────
 
 printf "\nCreating remote repositories...\n"
 
@@ -277,14 +245,12 @@ create_bitbucket() {
     rm -f /tmp/newrepo_bb.json
 }
 
-# All four must succeed — if any creation fails after a clean preflight something
-# has gone very wrong, so abort immediately rather than leave a partial state.
 create_github    || exit 1
 create_gitlab    || exit 1
 create_codeberg  || exit 1
 create_bitbucket || exit 1
 
-# --- Local git setup ---
+# ── Local git setup ───────────────────────────────────────────────────────────
 
 printf "\nInitializing local repository in '%s'...\n" "$REPO_PATH"
 cd "$REPO_PATH"

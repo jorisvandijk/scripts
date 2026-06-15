@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+#	jHugoHelper 2.1
+#	Hugo site helper: server, new post, new status
+#	Dependencies: hugo, micro
+#	Usage: jHugoHelper {server|new|status} [post-name]
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jHugoHelper" && exit 0
+
+case "$1" in
+    server)
+        cd ~/git/website || j::die "could not cd to ~/git/website"
+        hugo server -D
+        rm ~/git/website/.hugo_build.lock 2>/dev/null
+        ;;
+    new)
+        [[ -z "$2" ]] && j::die "post name required — usage: jHugoHelper new <post-name>"
+        cd ~/git/website || j::die "could not cd to ~/git/website"
+        hugo new "posts/${2}.md"
+        micro "content/posts/${2}.md"
+        ;;
+    status)
+        cd ~/git/website || j::die "could not cd to ~/git/website"
+        timestamp="$(date +%Y-%m-%d-%H%M%S)"
+        filepath="content/status/${timestamp}.md"
+        [[ -e "$filepath" ]] && j::die "${filepath} already exists"
+        hugo new "status/${timestamp}.md"
+        micro "$filepath"
+        ;;
+    *)
+        j::die "usage: jHugoHelper {server|new|status} [post-name]"
+        ;;
+esac

@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+#	jList 2.0
+#	Directory listing with eza
+#	Dependencies: eza
+#	Usage: jList [eza args]
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jList" && exit 0
+
+opts=(
+    -l -b
+    --header
+    --color=always
+    --group-directories-first
+    --git
+    --git-repos
+    --icons
+    --hyperlink
+    --time-style=long-iso
+)
+
+extra=()
+show_hidden=0
+
+for arg in "$@"; do
+    case "$arg" in
+        -a|--all) show_hidden=1 ;;
+    esac
+done
+
+[[ "$show_hidden" -eq 0 && "$PWD" == "$HOME" ]] \
+    && extra=(--ignore-glob "Music|Movies|Pictures|Applications|Desktop|Library")
+
+exec eza "${opts[@]}" "${extra[@]}" "$@"

@@ -1,0 +1,31 @@
+NAME
+    jNexusVerifyDir — verify Nexus mod downloads against the API
+
+SYNOPSIS
+    jNexusVerifyDir [options]
+
+    Options:
+      -h, --help              Show this help
+      -v, --version           Show version
+      --game <slug>           Game slug to query (default: skyrimspecialedition)
+      --skip-archive-test     Skip integrity test of downloaded archives
+
+DESCRIPTION
+
+jNexusVerifyDir scans the current directory for downloaded Nexus mod archives,
+extracts mod and file IDs from their filenames, and cross-references each file
+against the Nexus Mods API to verify name, size, and integrity. By default it
+also tests each archive (zip/7z/rar) to confirm it is not corrupted. Requires
+a Nexus API key in ~/.config/nexus-modlist-dl/config. Requires curl, jq,
+unzip, and 7z. RAR integrity testing uses unrar when available.
+
+EXAMPLES
+
+    jNexusVerifyDir
+        Verify all Nexus mod files in the current directory for Skyrim SE.
+
+    jNexusVerifyDir --game morrowind
+        Verify files against the Morrowind game endpoint.
+
+    jNexusVerifyDir --skip-archive-test
+        Check API metadata only, skip the local archive integrity test.

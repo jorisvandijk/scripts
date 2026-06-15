@@ -1,0 +1,31 @@
+NAME
+    jNexusModlistDl — download Nexus mods from a markdown modlist
+
+SYNOPSIS
+    jNexusModlistDl [options] <modlist.md> [target-dir]
+
+    Options:
+      -h, --help              Show this help
+      -v, --version           Show version
+      --include-optional      Also download files marked OPTIONAL
+      --dry-run               Resolve all mod IDs but do not download
+
+DESCRIPTION
+
+jNexusModlistDl parses a markdown file for Nexus Mods URLs of the form
+https://www.nexusmods.com/<game>/mods/<id>, resolves each mod's latest file
+via the Nexus API, and downloads it to the target directory (default:
+~/Downloads/skyrim-mods). A Nexus API key must be stored in
+~/.config/nexus-modlist-dl/config as NEXUS_API_KEY="...". Optional mod
+entries are skipped unless --include-optional is given. Requires curl and jq.
+
+EXAMPLES
+
+    jNexusModlistDl modlist.md
+        Download all required mods listed in modlist.md to the default dir.
+
+    jNexusModlistDl --include-optional modlist.md ~/mods/skyrim
+        Download required and optional mods to a custom directory.
+
+    jNexusModlistDl --dry-run modlist.md
+        Resolve all mod files and print what would be downloaded.

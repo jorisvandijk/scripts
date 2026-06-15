@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#	jFlac2Alac 2.1
+#	Batch-convert FLAC files to Apple Lossless (ALAC)
+#	Dependencies: ffmpeg
+#	Usage: jFlacToAlac <directory>
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jFlac2Alac" && exit 0
+
+[[ -z "$1" ]]    && j::die "usage: jFlac2Alac <directory>"
+[[ ! -d "$1" ]]  && j::die "'$1' is not a directory"
+
+LOG_FILE="./log.txt"
+
+find "$1" -type f -name "*.flac" | while read -r flac_file; do
+    m4a_file="${flac_file%.flac}.m4a"
+
+    j::info "Converting: $flac_file"
+
+    if ffmpeg -y -i "$flac_file" -c:v copy -c:a alac "$m4a_file" -loglevel error < /dev/null; then
+        rm "$flac_file"
+        j::info "Done: $m4a_file"
+    else
+        j::warn "FAILED: $flac_file — original kept"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] FAILED: $flac_file" >> "$LOG_FILE"
+    fi
+done

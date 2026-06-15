@@ -1,0 +1,33 @@
+NAME
+    jHugoHelper — Hugo site helper
+
+SYNOPSIS
+    jHugoHelper [options] {server|new|status} [post-name]
+
+    Commands:
+      server          Start the Hugo development server with drafts enabled
+      new <name>      Create a new post and open it in micro
+      status          Create a new timestamped status entry and open it in micro
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+jHugoHelper automates the three most common Hugo workflows for the site at
+~/git/website. The server command starts a live-reload development server and
+cleans up the build lock on exit. The new command scaffolds a post under
+content/posts/ and immediately opens it for editing. The status command
+creates a timestamped entry under content/status/ for short-form updates.
+
+EXAMPLES
+
+    jHugoHelper server
+        Start the Hugo dev server with drafts visible at http://localhost:1313.
+
+    jHugoHelper new my-new-post
+        Create content/posts/my-new-post.md and open it in micro.
+
+    jHugoHelper status
+        Create a status entry named by the current timestamp and open it.

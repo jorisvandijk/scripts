@@ -1,27 +1,22 @@
 #!/usr/bin/env bash
-# gamesnostalgia-dl — GamesNostalgia CLI
+#	jGamesNostalgiaDl 2.1
+#	Interactive game downloader for GamesNostalgia.com
+#	Dependencies: curl, fzf
+#	Usage: jGamesNostalgiaDl [-s <query>] [-d <slug>] [-p <platform>] [-a <tag>] [-b]
 #
-# Interactive mode (no flags):
-#   gamesnostalgia-dl
-#
-# Direct usage:
-#   gamesnostalgia-dl -s <query>
-#   gamesnostalgia-dl -d <slug> [-p <platform>]
-#   gamesnostalgia-dl -b
-#
-# Examples:
-#   gamesnostalgia-dl -s doom
-#   gamesnostalgia-dl -d doom
-#   gamesnostalgia-dl -d "doom-ii_" -p dos
-#   gamesnostalgia-dl -b
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help" || "$1" == "-h" ]]    && j::help "jGamesNostalgiaDl" && exit 0
 
 set -eo pipefail
 
 BASE_URL="https://gamesnostalgia.com"
 UA="Mozilla/5.0"
 
-# --- Platform tier list for auto mode (-a) ---
-# First match wins. Games with no matching platform are skipped.
 TIER_LIST=(
     windows
     windows-3.x
@@ -44,38 +39,37 @@ TIER_LIST=(
     pc-engine
 )
 
-# --- Require fzf ---
-if ! command -v fzf &>/dev/null; then
-    echo "Error: fzf is required but not installed."
-    echo "Install it with: brew install fzf"
-    exit 1
-fi
+command -v fzf &>/dev/null || j::die "fzf is required but not installed (brew install fzf)"
 
 usage() {
-    echo "Usage:"
-    echo "  gamesnostalgia-dl                      Interactive mode"
-    echo "  gamesnostalgia-dl -b                   Bulk download mode"
-    echo "  gamesnostalgia-dl -s <query>           Search for a game"
-    echo "  gamesnostalgia-dl -d <slug> [-p plat]  Download by slug"
-    echo "  gamesnostalgia-dl -a <tag>  [-p plat]  Download all games in a tag/genre"
-    echo "                                         Uses TIER_LIST if -p not specified"
-    echo ""
-    echo "Examples:"
-    echo "  gamesnostalgia-dl -s doom"
-    echo "  gamesnostalgia-dl -d doom"
-    echo "  gamesnostalgia-dl -d \"doom-ii_\" -p dos"
-    echo "  gamesnostalgia-dl -b"
-    echo "  gamesnostalgia-dl -a adventure"
-    echo "  gamesnostalgia-dl -a \"point+and+click\" -p dos"
+    cat << 'EOF'
+Usage:
+  jGamesNostalgiaDl                      Interactive mode
+  jGamesNostalgiaDl -b                   Bulk download mode
+  jGamesNostalgiaDl -s <query>           Search for a game
+  jGamesNostalgiaDl -d <slug> [-p plat]  Download by slug
+  jGamesNostalgiaDl -a <tag>  [-p plat]  Download all games in a tag/genre
+
+Examples:
+  jGamesNostalgiaDl -s doom
+  jGamesNostalgiaDl -d doom
+  jGamesNostalgiaDl -d "doom-ii_" -p dos
+  jGamesNostalgiaDl -b
+  jGamesNostalgiaDl -a adventure
+  jGamesNostalgiaDl -a "point+and+click" -p dos
+EOF
     exit 1
 }
 
-# --- Search: returns lines of "slug|title|platforms|year|genre" ---
-fetch_results() {
+fetch_search_html() {
     local q
     q=$(echo "$1" | sed 's/ /+/g')
+    curl -sL --max-time 15 -A "$UA" "${BASE_URL}/search?q=${q}&lang=en"
+}
+
+fetch_results() {
     local html
-    html=$(curl -sL --max-time 15 -A "$UA" "${BASE_URL}/search?q=${q}&lang=en")
+    html=$(fetch_search_html "$1")
 
     local slugs=()
     while IFS= read -r line; do
@@ -94,7 +88,6 @@ fetch_results() {
     done
 }
 
-# --- Print results as a table (for -s flag) ---
 do_search() {
     echo ""
     echo "Results for: $1"
@@ -109,12 +102,10 @@ do_search() {
     echo ""
 }
 
-# --- Get English download IDs for a slug, optionally filtered by platform ---
 get_english_ids() {
     local slug="$1"
     local platform="$2"
     local game_html="$3"
-
     local section="$game_html"
 
     if [[ -n "$platform" ]]; then
@@ -130,8 +121,6 @@ get_english_ids() {
         section="$buf"
     fi
 
-    # Split on each <a so every download link becomes its own line,
-    # then filter to English-only entries.
     echo "$section" \
         | sed 's/<a /\n<a /g' \
         | grep "href='/download/${slug}/" \
@@ -141,7 +130,6 @@ get_english_ids() {
         | sort -u
 }
 
-# --- Download a single ID ---
 download_id() {
     local slug="$1"
     local id="$2"
@@ -151,11 +139,7 @@ download_id() {
 
     local g
     g=$(echo "$dl_page" | grep -oE 'g=[0-9]+&f=' | sed 's/g=//;s/&f=//' || true)
-
-    if [[ -z "$g" ]]; then
-        echo "  [!] Could not find g param for ID $id — skipping"
-        return 1
-    fi
+    [[ -z "$g" ]] && echo "  [!] Could not find g param for ID $id — skipping" && return 1
 
     local api
     api=$(curl -sL --max-time 15 -A "$UA" \
@@ -163,11 +147,7 @@ download_id() {
 
     local url
     url=$(echo "$api" | grep -oE "href='https://[^']+" | sed "s/href='//")
-
-    if [[ -z "$url" ]]; then
-        echo "  [!] Could not extract file URL for ID $id — skipping"
-        return 1
-    fi
+    [[ -z "$url" ]] && echo "  [!] Could not extract file URL for ID $id — skipping" && return 1
 
     local filename
     filename=$(echo "$url" | sed 's|.*/||')
@@ -186,7 +166,6 @@ download_id() {
     fi
 }
 
-# --- Download entry point ---
 do_download() {
     local slug="$1"
     local platform="$2"
@@ -201,10 +180,7 @@ do_download() {
         [[ -n "$id" ]] && ids+=("$id")
     done < <(get_english_ids "$slug" "$platform" "$game_html")
 
-    if [[ ${#ids[@]} -eq 0 ]]; then
-        echo "No English downloads found for: $slug${platform:+ (platform: $platform)}"
-        return 1
-    fi
+    [[ ${#ids[@]} -eq 0 ]] && echo "No English downloads found for: $slug${platform:+ (platform: $platform)}" && return 1
 
     echo "Found ${#ids[@]} English download(s)"
     echo ""
@@ -214,80 +190,25 @@ do_download() {
     done
 }
 
-# --- Interactive mode ---
 do_interactive() {
     while true; do
-        # Search prompt
-        echo ""
-        printf "Search (Esc to quit): "
-        local query
-        read -r query || { echo ""; exit 0; }
-        [[ -z "$query" ]] && continue
+        local picked
+        picked=$(pick_game_interactive)
 
-        echo "Searching…"
-        local results
-        results=$(fetch_results "$query")
+        [[ -z "$picked" ]] && exit 0
 
-        if [[ -z "$results" ]]; then
-            echo "No results for: $query"
-            continue
-        fi
+        local slug platform game_html
+        slug=$(echo "$picked" | cut -d'|' -f1)
+        platform=$(echo "$picked" | cut -d'|' -f2)
 
-        # Pick a game with fzf
-        local selection
-        selection=$(echo "$results" | \
-            awk -F'|' '{ printf "%-40s  %-25s  %-6s  %s\n|%s\n", $2, $3, $4, $5, $1 }' | \
-            paste - - | \
-            fzf --prompt="Select game > " \
-                --delimiter="|" \
-                --with-nth=1 \
-                --height=40% \
-                --layout=reverse \
-                --border \
-                --bind="esc:abort" \
-            || true)
-
-        [[ -z "$selection" ]] && exit 0
-
-        local slug
-        slug=$(echo "$selection" | cut -d'|' -f2 | tr -d ' ')
-
-        # Get platforms for this game
-        local game_html
         game_html=$(curl -sL --max-time 15 -A "$UA" "${BASE_URL}/game/${slug}")
 
-        local platforms=()
-        while IFS= read -r p; do
-            [[ -n "$p" ]] && platforms+=("$p")
-        done < <(echo "$game_html" | grep -oE "id='downloads-[^']+'" | sed "s/id='downloads-//;s/'//" | sort -u)
-
-        local platform=""
-        if [[ ${#platforms[@]} -gt 1 ]]; then
-            local plat_selection
-            plat_selection=$(printf '%s\n' "${platforms[@]}" | \
-                fzf --prompt="Select platform > " \
-                    --height=40% \
-                    --layout=reverse \
-                    --border \
-                    --bind="esc:abort" \
-                || true)
-            [[ -z "$plat_selection" ]] && continue
-            platform="$plat_selection"
-        elif [[ ${#platforms[@]} -eq 1 ]]; then
-            platform="${platforms[0]}"
-            echo "Platform: $platform (only option)"
-        fi
-
-        # Download
         local ids=()
         while IFS= read -r id; do
             [[ -n "$id" ]] && ids+=("$id")
         done < <(get_english_ids "$slug" "$platform" "$game_html")
 
-        if [[ ${#ids[@]} -eq 0 ]]; then
-            echo "No English downloads found."
-            continue
-        fi
+        [[ ${#ids[@]} -eq 0 ]] && echo "No English downloads found." && continue
 
         echo "Found ${#ids[@]} English download(s) for '$slug' [$platform]"
         echo ""
@@ -300,9 +221,6 @@ do_interactive() {
     done
 }
 
-# --- Bulk mode: pick a game interactively ---
-# Prints "slug|platform|label" to stdout. All status messages go to stderr.
-# Prints nothing if the user cancels at any step.
 pick_game_interactive() {
     echo "" >&2
     printf "Search (Esc to cancel): " >&2
@@ -313,11 +231,7 @@ pick_game_interactive() {
     echo "Searching…" >&2
     local results
     results=$(fetch_results "$query")
-
-    if [[ -z "$results" ]]; then
-        echo "No results for: $query" >&2
-        return 0
-    fi
+    [[ -z "$results" ]] && echo "No results for: $query" >&2 && return 0
 
     local selection
     selection=$(echo "$results" | \
@@ -344,35 +258,14 @@ pick_game_interactive() {
     local game_html
     game_html=$(curl -sL --max-time 15 -A "$UA" "${BASE_URL}/game/${slug}")
 
-    local platforms=()
-    while IFS= read -r p; do
-        [[ -n "$p" ]] && platforms+=("$p")
-    done < <(echo "$game_html" | grep -oE "id='downloads-[^']+'" | sed "s/id='downloads-//;s/'//" | sort -u)
-
-    local platform=""
-    if [[ ${#platforms[@]} -gt 1 ]]; then
-        local plat_selection
-        plat_selection=$(printf '%s\n' "${platforms[@]}" | \
-            fzf --prompt="Select platform > " \
-                --height=40% \
-                --layout=reverse \
-                --border \
-                --bind="esc:abort" \
-            || true)
-        [[ -z "$plat_selection" ]] && return 0
-        platform="$plat_selection"
-    elif [[ ${#platforms[@]} -eq 1 ]]; then
-        platform="${platforms[0]}"
-        echo "Platform: $platform (only option)" >&2
-    fi
+    local platform
+    platform=$(select_platform "$game_html") || return 0
 
     local label="${title:-$slug}"
     [[ -n "$platform" ]] && label="${label} [${platform}]"
-
     printf "%s|%s|%s\n" "$slug" "$platform" "$label"
 }
 
-# --- Bulk download mode ---
 do_bulk() {
     local bulk_slugs=()
     local bulk_platforms=()
@@ -386,7 +279,6 @@ do_bulk() {
     echo ""
 
     while true; do
-        # Build the fzf menu
         local menu=""
         local i=0
         while [[ $i -lt ${#bulk_slugs[@]} ]]; do
@@ -394,9 +286,7 @@ do_bulk() {
             i=$((i + 1))
         done
 
-        if [[ ${#bulk_slugs[@]} -gt 0 ]]; then
-            menu="${menu}▶  Download all (${#bulk_slugs[@]})"$'\n'
-        fi
+        [[ ${#bulk_slugs[@]} -gt 0 ]] && menu="${menu}▶  Download all (${#bulk_slugs[@]})"$'\n'
         menu="${menu}+  Add game"$'\n'
         menu="${menu}✗  Cancel"
 
@@ -420,7 +310,6 @@ do_bulk() {
         [[ -z "$choice" ]] && return 0
 
         if echo "$choice" | grep -q "^▶"; then
-            # --- Download all queued games ---
             echo ""
             echo "Starting bulk download — ${#bulk_slugs[@]} game(s)…"
             local i=0
@@ -430,9 +319,7 @@ do_bulk() {
                 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                 echo "  [$(( i + 1 ))/${#bulk_slugs[@]}] ${bulk_labels[$i]}"
                 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                if ! do_download "${bulk_slugs[$i]}" "${bulk_platforms[$i]}"; then
-                    failed_labels+=("${bulk_labels[$i]}")
-                fi
+                do_download "${bulk_slugs[$i]}" "${bulk_platforms[$i]}" || failed_labels+=("${bulk_labels[$i]}")
                 i=$((i + 1))
             done
             echo ""
@@ -447,7 +334,6 @@ do_bulk() {
             return 0
 
         elif echo "$choice" | grep -q "^+"; then
-            # --- Add a game to the queue ---
             local picked
             picked=$(pick_game_interactive)
 
@@ -457,7 +343,6 @@ do_bulk() {
                 pplatform=$(echo "$picked" | cut -d'|' -f2)
                 plabel=$(echo "$picked" | cut -d'|' -f3-)
 
-                # Duplicate check
                 local dup=0
                 local j=0
                 while [[ $j -lt ${#bulk_slugs[@]} ]]; do
@@ -484,13 +369,10 @@ do_bulk() {
             return 0
 
         else
-            # --- Remove a queued item (user selected a ✓ line) ---
             local clicked_label
             clicked_label=$(echo "$choice" | sed 's/^  ✓  //')
 
-            local new_slugs=()
-            local new_platforms=()
-            local new_labels=()
+            local new_slugs=() new_platforms=() new_labels=()
             local j=0
             while [[ $j -lt ${#bulk_slugs[@]} ]]; do
                 if [[ "${bulk_labels[$j]}" != "$clicked_label" ]]; then
@@ -506,9 +388,7 @@ do_bulk() {
                 bulk_platforms=("${new_platforms[@]}")
                 bulk_labels=("${new_labels[@]}")
             else
-                bulk_slugs=()
-                bulk_platforms=()
-                bulk_labels=()
+                bulk_slugs=() bulk_platforms=() bulk_labels=()
             fi
 
             echo "  ✗ Removed: $clicked_label"
@@ -517,22 +397,48 @@ do_bulk() {
     done
 }
 
-# --- Pick best platform from available list using TIER_LIST ---
-# Prints the winning platform slug, or nothing if no match.
+extract_platforms() {
+    local game_html="$1"
+    echo "$game_html" | grep -oE "id='downloads-[^']+'" | sed "s/id='downloads-//;s/'//" | sort -u
+}
+
+select_platform() {
+    local game_html="$1"
+    local platforms=()
+    while IFS= read -r p; do
+        [[ -n "$p" ]] && platforms+=("$p")
+    done < <(extract_platforms "$game_html")
+
+    [[ ${#platforms[@]} -eq 0 ]] && return 1
+
+    if [[ ${#platforms[@]} -eq 1 ]]; then
+        echo "Platform: ${platforms[0]} (only option)" >&2
+        echo "${platforms[0]}"
+        return 0
+    fi
+
+    local chosen
+    chosen=$(printf '%s\n' "${platforms[@]}" | \
+        fzf --prompt="Select platform > " \
+            --height=40% \
+            --layout=reverse \
+            --border \
+            --bind="esc:abort" \
+        || true)
+    [[ -z "$chosen" ]] && return 1
+    echo "$chosen"
+}
+
 pick_platform_by_tier() {
-    local available="$1"   # newline-separated platform slugs
+    local available="$1"
     for tier_plat in "${TIER_LIST[@]}"; do
         while IFS= read -r avail; do
-            if [[ "$avail" == "$tier_plat" ]]; then
-                echo "$tier_plat"
-                return 0
-            fi
+            [[ "$avail" == "$tier_plat" ]] && echo "$tier_plat" && return 0
         done < <(echo "$available")
     done
     return 1
 }
 
-# --- Fetch all game slugs for a tag/genre, handling pagination ---
 fetch_tag_slugs() {
     local tag="$1"
     local page=1
@@ -549,32 +455,21 @@ fetch_tag_slugs() {
         echo "  Fetching page ${page}…" >&2
         local html
         html=$(curl -sL --max-time 15 -A "$UA" "$url")
-
-        if [[ -z "$html" ]]; then
-            break
-        fi
+        [[ -z "$html" ]] && break
 
         local slugs
         slugs=$(echo "$html" | grep -oE 'href="/game/[^"]+' | sed 's|href="/game/||' | awk '!seen[$0]++')
-
-        if [[ -z "$slugs" ]]; then
-            break
-        fi
+        [[ -z "$slugs" ]] && break
 
         all_slugs="${all_slugs}${slugs}"$'\n'
 
-        # Stop if there's no Next page link
-        if ! echo "$html" | grep -q "href='/games/${tag}/page/$((page + 1))'"; then
-            break
-        fi
-
+        echo "$html" | grep -q "href='/games/${tag}/page/$((page + 1))'" || break
         page=$((page + 1))
     done
 
     echo "$all_slugs" | awk 'NF && !seen[$0]++'
 }
 
-# --- Auto download all games in a tag/genre ---
 do_auto() {
     local tag="$1"
     local platform_override="$2"
@@ -586,10 +481,7 @@ do_auto() {
         [[ -n "$slug" ]] && slugs+=("$slug")
     done < <(fetch_tag_slugs "$tag")
 
-    if [[ ${#slugs[@]} -eq 0 ]]; then
-        echo "No games found for: $tag"
-        exit 1
-    fi
+    [[ ${#slugs[@]} -eq 0 ]] && j::die "no games found for: $tag"
 
     echo "Found ${#slugs[@]} game(s) — starting download…"
     echo ""
@@ -601,7 +493,6 @@ do_auto() {
         echo "  [${i}/${#slugs[@]}] ${slug}"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-        # Fetch game page once, use it for both platform detection and download
         local game_html
         game_html=$(curl -sL --max-time 15 -A "$UA" "${BASE_URL}/game/${slug}")
 
@@ -653,7 +544,8 @@ do_auto() {
     echo "All done — ${i} game(s) processed."
 }
 
-# --- Entry point ---
+# ── Entry point ───────────────────────────────────────────────────────────────
+
 MODE="" QUERY="" SLUG="" PLATFORM="" TAG=""
 
 while getopts "s:d:p:a:b" opt; do
@@ -667,10 +559,7 @@ while getopts "s:d:p:a:b" opt; do
     esac
 done
 
-# No flags = interactive
-if [[ -z "$MODE" && $OPTIND -eq 1 ]]; then
-    MODE=interactive
-fi
+[[ -z "$MODE" && $OPTIND -eq 1 ]] && MODE=interactive
 
 case "$MODE" in
     search)      do_search "$QUERY" ;;

@@ -1,0 +1,39 @@
+NAME
+    jGamesNostalgiaDl — interactive retro game downloader
+
+SYNOPSIS
+    jGamesNostalgiaDl [options]
+
+    Options:
+      -h, --help               Show this help
+      -v, --version            Show version
+      -s <query>               Search for a game by name
+      -d <slug> [-p <plat>]   Download a game by its URL slug
+      -a <tag>  [-p <plat>]   Download all games in a tag or genre
+      -b                       Bulk download mode (all platforms in tier order)
+
+DESCRIPTION
+
+jGamesNostalgiaDl scrapes GamesNostalgia.com to search for, preview, and
+download classic games. Without flags it enters interactive mode: fzf is used
+to browse search results with a description preview, and the chosen game is
+downloaded for the best available platform according to a built-in tier list.
+The -b flag iterates through all platforms in tier order and downloads every
+available game. Requires curl and fzf.
+
+EXAMPLES
+
+    jGamesNostalgiaDl
+        Launch interactive search mode.
+
+    jGamesNostalgiaDl -s doom
+        Search for "doom" and pick a result with fzf.
+
+    jGamesNostalgiaDl -d doom -p dos
+        Download the DOS version of the game with slug "doom" directly.
+
+    jGamesNostalgiaDl -a adventure -p dos
+        Download all DOS games tagged "adventure".
+
+    jGamesNostalgiaDl -b
+        Bulk download every game across all supported platforms.

@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+#	jHeic2Png 2.2
+#	Convert HEIC images to PNG using macOS sips
+#	Dependencies: sips (macOS built-in)
+#	Usage: jHeicToPng <file> [file2 ...]
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jHeic2Png" && exit 0
+
+[[ $# -eq 0 ]] && j::die "usage: jHeic2Png <file> [file2 ...]"
+
+convert_file() {
+    local input="$1"
+    local output="${input%.*}.png"
+
+    if [[ ! -f "$input" ]]; then
+        j::error "file not found: $input"
+        return 1
+    fi
+
+    if [[ -f "$output" ]]; then
+        j::error "output already exists: $output"
+        return 1
+    fi
+
+    if ! /usr/bin/sips -s format png "$input" --out "$output" 2>/dev/null; then
+        j::error "failed to convert $input"
+        return 1
+    fi
+
+    j::info "Converted: $input -> $output"
+}
+
+failed=0
+for file in "$@"; do
+    convert_file "$file" || failed=1
+done
+exit "$failed"

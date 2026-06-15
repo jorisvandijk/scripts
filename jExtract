@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+#	jExtract 2.0
+#	Smart archive extraction
+#	Dependencies: tar, unzip, bunzip2, gunzip, 7zz
+#	Usage: jExtract <file>
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jExtract" && exit 0
+
+[[ -z "$1" ]]    && j::die "usage: jExtract <file>"
+[[ ! -f "$1" ]]  && j::die "'$1' is not a valid file"
+
+case "$1" in
+    *.tar.bz2)  tar xvjf "$1"   ;;
+    *.tar.gz)   tar xvzf "$1"   ;;
+    *.bz2)      bunzip2 "$1"    ;;
+    *.rar)      7zz x "$1"      ;;
+    *.gz)       gunzip "$1"     ;;
+    *.tar)      tar xvf "$1"    ;;
+    *.tbz2)     tar xvjf "$1"   ;;
+    *.tgz)      tar xvzf "$1"   ;;
+    *.zip)      unzip "$1"      ;;
+    *.7z)       7zz x "$1"      ;;
+    *.xz)       tar xvJf "$1"   ;;
+    *)          j::die "don't know how to extract '$1'" ;;
+esac

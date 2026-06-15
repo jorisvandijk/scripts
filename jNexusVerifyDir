@@ -1,0 +1,243 @@
+#!/usr/bin/env bash
+#	jNexusVerifyDir 2.0
+#	Verify Nexus mod downloads in the current directory against the API
+#	Dependencies: curl, jq, unzip, 7z
+#	Usage: jNexusVerifyDir [--game <slug>] [--skip-archive-test]
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jNexusVerifyDir" && exit 0
+
+set -euo pipefail
+
+GAME="skyrimspecialedition"
+SKIP_ARCHIVE_TEST=0
+API_BASE="https://api.nexusmods.com/v1"
+CONFIG_FILE="${HOME}/.config/nexus-modlist-dl/config"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --game)               GAME="$2"; shift 2 ;;
+        --skip-archive-test)  SKIP_ARCHIVE_TEST=1; shift ;;
+        -h|--help)
+            echo "Usage: jNexusVerifyDir [--game <slug>] [--skip-archive-test]"
+            exit 0 ;;
+        *) j::die "unknown arg: $1" ;;
+    esac
+done
+
+[[ -f "${CONFIG_FILE}" ]] || j::die "missing config: ${CONFIG_FILE}"
+# shellcheck source=/dev/null
+source "${CONFIG_FILE}"
+[[ -n "${NEXUS_API_KEY:-}" ]] || j::die "NEXUS_API_KEY not set"
+
+command -v jq   >/dev/null || j::die "jq not found"
+command -v curl >/dev/null || j::die "curl not found"
+
+# stat: macOS uses -f%z, Linux uses -c%s
+if stat -f%z /dev/null >/dev/null 2>&1; then
+    STAT_SIZE() { stat -f%z "$1"; }
+else
+    STAT_SIZE() { stat -c%s "$1"; }
+fi
+
+declare -A FILES_JSON_CACHE
+
+fetch_mod_files() {
+    local mod_id="$1"
+    sleep 1
+    local body http_code tmp_body
+    tmp_body="$(mktemp)"
+    http_code=$(curl -sS \
+        -w '%{http_code}' \
+        -o "${tmp_body}" \
+        -H "apikey: ${NEXUS_API_KEY}" \
+        -H "Accept: application/json" \
+        "${API_BASE}/games/${GAME}/mods/${mod_id}/files.json" 2>/dev/null) || {
+        rm -f "${tmp_body}"
+        echo "curl failed for mod ${mod_id}" >&2
+        return 1
+    }
+    body="$(cat "${tmp_body}")"
+    rm -f "${tmp_body}"
+    if [[ "${http_code}" != "200" ]]; then
+        local msg
+        msg=$(jq -r '.message // .error // empty' <<< "${body}" 2>/dev/null || true)
+        echo "HTTP ${http_code} for mod ${mod_id}${msg:+: ${msg}}" >&2
+        return 1
+    fi
+    if ! jq -e '.files | type == "array"' >/dev/null 2>&1 <<< "${body}"; then
+        local msg
+        msg=$(jq -r '.message // .error // "no .files array"' <<< "${body}" 2>/dev/null || echo "unparseable")
+        echo "malformed response for mod ${mod_id}: ${msg}" >&2
+        return 1
+    fi
+    printf '%s' "${body}"
+}
+
+api_get_files() {
+    local mod_id="$1"
+    if [[ -n "${FILES_JSON_CACHE[$mod_id]:-}" ]]; then
+        printf '%s' "${FILES_JSON_CACHE[$mod_id]}"
+        return 0
+    fi
+    local body
+    body=$(fetch_mod_files "${mod_id}") || return 1
+    FILES_JSON_CACHE[$mod_id]="${body}"
+    printf '%s' "${body}"
+}
+
+# Extract mod ID from Nexus filename.
+# The mod ID is the first all-digit dash-separated token with fewer than 10 digits
+# (10-digit tokens are unix timestamps).
+extract_mod_id() {
+    local fname="$1"
+    local base="${fname%.*}"
+    base="${base%.7z}"
+    local IFS='-'
+    local -a tokens
+    read -ra tokens <<< "${base}"
+    local tok
+    for tok in "${tokens[@]}"; do
+        [[ "$tok" =~ ^[0-9]+$ ]] && [[ "${#tok}" -lt 10 ]] && echo "$tok" && return 0
+    done
+    return 1
+}
+
+shopt -s nullglob
+mapfile -t archives < <(printf '%s\n' *.zip *.7z *.rar | sort)
+shopt -u nullglob
+
+[[ ${#archives[@]} -eq 0 ]] && j::die "no archives found in $(pwd)"
+
+echo "Verifying ${#archives[@]} archive(s) against Nexus API (game: ${GAME})"
+echo
+
+declare -i ok=0 size_bad=0 archive_bad=0 unparseable=0 api_failed=0 not_found=0
+declare -a issues=()
+
+for fname in "${archives[@]}"; do
+    if ! mod_id=$(extract_mod_id "$fname"); then
+        printf '  ??       %s (no mod ID extractable from filename)\n' "$fname"
+        unparseable+=1
+        issues+=("$fname: no mod ID extractable")
+        continue
+    fi
+
+    if ! files_json=$(api_get_files "${mod_id}"); then
+        printf '  API-ERR  %s (mod %s)\n' "$fname" "$mod_id"
+        api_failed+=1
+        issues+=("$fname: API request failed for mod ${mod_id}")
+        continue
+    fi
+
+    sizes=$(jq -r --arg name "$fname" '
+        .files // [] |
+        map(select(.file_name == $name)) |
+        .[0] |
+        if . == null then "||"
+        else "\(.size_in_bytes)|\(.size)" end
+    ' <<< "${files_json}" 2>/dev/null)
+
+    IFS='|' read -r expected_bytes expected_kb <<< "${sizes}"
+
+    actual=$(STAT_SIZE "$fname")
+    expected_source=""
+    expected=""
+
+    if [[ -n "${expected_bytes}" && "${expected_bytes}" != "null" ]]; then
+        expected="${expected_bytes}"
+        expected_source="bytes"
+    elif [[ -n "${expected_kb}" && "${expected_kb}" != "null" ]]; then
+        expected=$(( expected_kb * 1024 ))
+        expected_source="kb"
+    else
+        printf '  NOT-LIST %s (not in mod %s current files, or no size data)\n' "$fname" "$mod_id"
+        not_found+=1
+        issues+=("$fname: not in mod ${mod_id} current file list (likely outdated)")
+        continue
+    fi
+
+    if [[ "${expected_source}" == "kb" ]]; then
+        tolerance=1024
+    else
+        tolerance=1
+    fi
+
+    diff=$(( actual > expected ? actual - expected : expected - actual ))
+
+    if [[ ${diff} -le ${tolerance} ]]; then
+        if [[ ${diff} -eq 0 ]]; then
+            printf '  OK       %s (%s bytes)\n' "$fname" "$actual"
+        else
+            printf '  OK*      %s (%s bytes, API reports %s via %s — diff %s within tolerance)\n' \
+                "$fname" "$actual" "$expected" "$expected_source" "$diff"
+        fi
+    else
+        printf '  SIZE-BAD %s (expected %s, got %s, diff %s, source: %s)\n' \
+            "$fname" "$expected" "$actual" "$diff" "$expected_source"
+        size_bad+=1
+        issues+=("$fname: size mismatch (expected ${expected}, got ${actual}, diff ${diff})")
+        continue
+    fi
+
+    if [[ ${SKIP_ARCHIVE_TEST} -eq 0 ]]; then
+        case "$fname" in
+            *.zip)
+                if ! unzip -tq "$fname" >/dev/null 2>&1; then
+                    printf '  ARCH-BAD %s (archive integrity test failed)\n' "$fname"
+                    archive_bad+=1
+                    issues+=("$fname: archive integrity test failed")
+                    continue
+                fi
+                ;;
+            *.7z)
+                if ! 7z t "$fname" >/dev/null 2>&1; then
+                    printf '  ARCH-BAD %s (archive integrity test failed)\n' "$fname"
+                    archive_bad+=1
+                    issues+=("$fname: archive integrity test failed")
+                    continue
+                fi
+                ;;
+            *.rar)
+                if command -v unrar >/dev/null; then
+                    if ! unrar t -inul "$fname" >/dev/null 2>&1; then
+                        printf '  ARCH-BAD %s (archive integrity test failed)\n' "$fname"
+                        archive_bad+=1
+                        issues+=("$fname: archive integrity test failed")
+                        continue
+                    fi
+                fi
+                ;;
+        esac
+    fi
+
+    ok+=1
+done
+
+cat << EOSUMMARY
+
+================================================================
+  Summary
+================================================================
+  Total archives:        ${#archives[@]}
+  OK:                    ${ok}
+  Size mismatch:         ${size_bad}
+  Archive corrupt:       ${archive_bad}
+  Not in mod file list:  ${not_found}
+  Unparseable filename:  ${unparseable}
+  API failures:          ${api_failed}
+EOSUMMARY
+
+if [[ ${#issues[@]} -gt 0 ]]; then
+    echo
+    echo "Issues:"
+    for i in "${issues[@]}"; do
+        printf '  - %s\n' "$i"
+    done
+    exit 1
+fi

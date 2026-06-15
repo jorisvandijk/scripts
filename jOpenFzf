@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+#	jOpenFzf 2.0
+#	Select files with fzf and open them in micro
+#	Dependencies: fzf, bat, micro
+#	Usage: jOpenFzf
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jOpenFzf" && exit 0
+
+cd || exit 1
+
+mapfile -t files < <(fzf -m --preview="bat --color=always {}")
+
+[[ ${#files[@]} -eq 0 ]] && exit 0
+
+micro "${files[@]}"

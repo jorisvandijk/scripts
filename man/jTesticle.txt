@@ -1,0 +1,20 @@
+NAME
+    jTesticle — test script template
+
+SYNOPSIS
+    jTesticle [options]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+jTesticle is a minimal template script used to verify the jScripts
+scaffolding. It prints "Balls" to stdout and serves as a reference
+implementation for new scripts.
+
+EXAMPLES
+
+    jTesticle
+        Prints "Balls" to the terminal.

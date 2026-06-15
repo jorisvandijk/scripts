@@ -1,0 +1,49 @@
+NAME
+    jSync — interactive rsync wrapper with fzf directory picker
+
+SYNOPSIS
+    jSync [options]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+jSync wraps rsync with an interactive fzf directory browser for selecting
+source and destination paths. On launch it prompts for one of three sync
+modes:
+
+  1) local → local     Both source and destination are on this machine.
+  2) local → external  Source is local; destination is on a remote host
+                       reached via SSH. Prompts for username and IP address.
+  3) external → local  Source is on a remote SSH host; destination is local.
+                       Prompts for username and IP address.
+
+For any directory source, jSync asks whether to sync the folder itself
+(destination/name/) or its contents only (destination/*) — this controls
+whether rsync appends a trailing slash to the source path.
+
+Uses fd for directory listing when available, falling back to find. Requires
+rsync and fzf; ssh is required for modes 2 and 3.
+
+HELP
+    Usage: jSync [options]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+EXAMPLES
+
+    jSync
+        Launch interactive mode. Select mode 1 for a local-to-local copy,
+        then pick source and destination via fzf.
+
+    jSync   (mode 2)
+        Select mode 2, pick a local source, enter remote credentials
+        (e.g. root@192.168.1.5), then pick the destination on the remote.
+
+    jSync   (mode 3)
+        Select mode 3, enter remote credentials, pick the source on the
+        remote via fzf, then pick a local destination.
