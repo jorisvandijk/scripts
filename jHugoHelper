@@ -27,9 +27,9 @@ case "$1" in
     status)
         cd ~/git/website || j::die "could not cd to ~/git/website"
         timestamp="$(date +%Y-%m-%d-%H%M%S)"
-        filepath="content/status/${timestamp}.md"
+        filepath="content/microblog/${timestamp}.md"
         [[ -e "$filepath" ]] && j::die "${filepath} already exists"
-        hugo new "status/${timestamp}.md"
+        hugo new "microblog/${timestamp}.md"
         micro "$filepath"
         ;;
     *)
