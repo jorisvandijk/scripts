@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jRepos 2.1
+#	jRepos 2.4
 #	Show git status of all repositories in ~/git
 #	Dependencies: git
 #	Usage: jRepos
@@ -17,42 +17,38 @@ GIT_BASE_DIR="${HOME}/git"
 
 collect_repo_status() {
     local repo_path="$1"
-    local orig_dir="$PWD"
-
-    [[ ! -d "$repo_path/.git" ]] && echo "not a git repo" && return
-
-    cd "$repo_path" || return
-
-    local status_output ahead_behind behind ahead
-    status_output="$(git status --porcelain 2>/dev/null)"
-    ahead_behind="$(git rev-list --count --left-right @{upstream}...HEAD 2>/dev/null || echo "0	0")"
-    behind="$(echo "$ahead_behind" | cut -f1)"
-    ahead="$(echo "$ahead_behind" | cut -f2)"
-
-    local staged=0 modified=0 untracked=0
-    if [[ -n "$status_output" ]]; then
-        modified="$(echo "$status_output" | grep -c "^.M\|^M" || true)"
-        untracked="$(echo "$status_output" | grep -c "^??" || true)"
-        staged="$(echo "$status_output" | grep -c "^[MADRC]" || true)"
-    fi
-
-    cd "$orig_dir" || true
-
-    printf '%s|%s|%s|%s|%s\n' "$staged" "$modified" "$untracked" "$ahead" "$behind"
+    [[ -e "$repo_path/.git" ]] || { echo "not a git repo"; return; }
+    local status_output behind ahead line x y
+    status_output="$(git -C "$repo_path" status --porcelain 2>/dev/null)"
+    read -r behind ahead < <(
+        git -C "$repo_path" rev-list --count --left-right @{upstream}...HEAD 2>/dev/null
+    ) || true
+    behind=${behind:-0} ahead=${ahead:-0}
+    local conflicted=0 staged=0 modified=0 untracked=0
+    while IFS= read -r line; do
+        [[ -z $line ]] && continue
+        x=${line:0:1} y=${line:1:1}
+        if [[ $x == U || $y == U || $x$y == 'AA' || $x$y == 'DD' ]]; then
+            (( ++conflicted )); continue
+        fi
+        [[ $x == [MADRC] ]] && (( ++staged ))
+        [[ $y == M ]]       && (( ++modified ))
+        [[ $x$y == '??' ]]  && (( ++untracked ))
+    done <<< "$status_output"
+    printf '%s|%s|%s|%s|%s|%s\n' "$conflicted" "$staged" "$modified" "$untracked" "$ahead" "$behind"
 }
 
 format_repo_status() {
     local raw="$1"
-    local staged modified untracked ahead behind
-    IFS='|' read -r staged modified untracked ahead behind <<< "$raw"
-
+    local conflicted staged modified untracked ahead behind
+    IFS='|' read -r conflicted staged modified untracked ahead behind <<< "$raw"
     local status_parts=()
-    [[ $staged -gt 0 ]]    && status_parts+=("$staged staged")
-    [[ $modified -gt 0 ]]  && status_parts+=("$modified modified")
-    [[ $untracked -gt 0 ]] && status_parts+=("$untracked untracked")
-    [[ $ahead -gt 0 ]]     && status_parts+=("ahead $ahead")
-    [[ $behind -gt 0 ]]    && status_parts+=("behind $behind")
-
+    [[ $conflicted -gt 0 ]] && status_parts+=("$conflicted conflicted")
+    [[ $staged -gt 0 ]]     && status_parts+=("$staged staged")
+    [[ $modified -gt 0 ]]   && status_parts+=("$modified modified")
+    [[ $untracked -gt 0 ]]  && status_parts+=("$untracked untracked")
+    [[ $ahead -gt 0 ]]      && status_parts+=("ahead $ahead")
+    [[ $behind -gt 0 ]]     && status_parts+=("behind $behind")
     if [[ ${#status_parts[@]} -eq 0 ]]; then
         echo "clean"
     else
@@ -70,7 +66,9 @@ get_repo_status() {
 
 classify_status() {
     local status="$1"
-    if [[ "$status" == "clean" ]]; then
+    if [[ "$status" =~ conflicted ]]; then
+        echo "conflict"
+    elif [[ "$status" == "clean" ]]; then
         echo "clean"
     elif [[ "$status" =~ (ahead|behind) ]]; then
         echo "sync"
@@ -81,6 +79,7 @@ classify_status() {
 
 [[ ! -d "$GIT_BASE_DIR" ]] && j::die "git directory not found: $GIT_BASE_DIR"
 
+conflict_entries=()
 sync_entries=()
 dirty_entries=()
 clean_entries=()
@@ -90,16 +89,21 @@ for repo_dir in "$GIT_BASE_DIR"/*/; do
     repo_name="$(basename "$repo_dir")"
     repo_status="$(get_repo_status "$repo_dir")"
     classification="$(classify_status "$repo_status")"
-
     case "$classification" in
-        sync)  sync_entries+=("${repo_name}|${repo_status}") ;;
-        dirty) dirty_entries+=("${repo_name}|${repo_status}") ;;
-        clean) clean_entries+=("${repo_name}|${repo_status}") ;;
+        conflict) conflict_entries+=("${repo_name}|${repo_status}") ;;
+        sync)     sync_entries+=("${repo_name}|${repo_status}") ;;
+        dirty)    dirty_entries+=("${repo_name}|${repo_status}") ;;
+        clean)    clean_entries+=("${repo_name}|${repo_status}") ;;
     esac
 done
 
-total=$(( ${#sync_entries[@]} + ${#dirty_entries[@]} + ${#clean_entries[@]} ))
+total=$(( ${#conflict_entries[@]} + ${#sync_entries[@]} + ${#dirty_entries[@]} + ${#clean_entries[@]} ))
+
 [[ $total -eq 0 ]] && echo "No git repositories found in: $GIT_BASE_DIR" && exit 0
+
+for entry in "${conflict_entries[@]}"; do
+    printf "${J_MAGENTA:-$J_RED}%-20s %s${J_RESET}\n" "${entry%|*}" "${entry#*|}"
+done
 
 for entry in "${sync_entries[@]}"; do
     printf "${J_RED}%-20s %s${J_RESET}\n" "${entry%|*}" "${entry#*|}"
