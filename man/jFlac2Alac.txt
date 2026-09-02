@@ -1,0 +1,25 @@
+NAME
+    jFlac2Alac - batch-convert FLAC files to Apple Lossless (ALAC)
+
+SYNOPSIS
+    jFlac2Alac [options] <directory>
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+Searches the given directory recursively for .flac files and converts
+each one to ALAC in an .m4a container using ffmpeg. The source file is
+deleted after a successful conversion. When a conversion fails, the
+original is kept and the failure is logged with a timestamp to log.txt
+in the target directory.
+
+EXAMPLES
+
+    jFlac2Alac ~/Music/Pink\ Floyd
+        Convert a whole album directory in place.
+
+    jFlac2Alac .
+        Convert everything in the current tree.

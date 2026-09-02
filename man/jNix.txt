@@ -1,0 +1,50 @@
+NAME
+    jNix - navigate and edit nix configuration files
+
+SYNOPSIS
+    jNix [type]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+    Types:
+      pkg             Nix packages (system-packages.nix)
+      brew            Homebrew formulas
+      cask            Homebrew casks
+      mas             Mac App Store apps
+      tap             Homebrew taps
+      alias           Shell aliases
+      abbr            zsh-abbr abbreviations
+      gabbr           zsh-abbr global abbreviations
+      var             Session variables (EDITOR, VISUAL, etc.)
+      program         Home-manager program configs (home-*.nix)
+      file            All .nix files
+
+DESCRIPTION
+
+Opens an fzf picker over the nix configuration at ~/Git/nix/. Each entry
+is tagged by type and links to the file and line where it is defined.
+
+Without a type argument all categories are shown together. Pass a type to
+narrow the list to that category only.
+
+Selecting an entry opens it in micro at the exact line. After micro exits,
+jNix asks whether to run sudo darwin-rebuild switch to apply the change.
+
+CTRL-B in the picker opens the file read-only in bat instead of editing.
+
+EXAMPLES
+
+    jNix
+        Open the full picker across all config categories.
+
+    jNix pkg
+        Show only nix packages; select one to jump to its line in
+        system-packages.nix.
+
+    jNix alias
+        Browse shell aliases defined in home-shell.nix.
+
+    jNix cask
+        Browse Homebrew casks; select one to edit system-homebrew.nix.

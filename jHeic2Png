@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+#	jHeic2Png 2.5
+#	Convert HEIC images to PNG
+#	Dependencies: sips (macOS), heif-convert (Linux)
+#	Usage: jHeic2Png <file> [file2 ...]
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jHeic2Png" && exit 0
+
+[[ -z "$1" ]] && j::die "Usage: jHeic2Png <file> [file2 ...]"
+
+_convert_macos() { sips -s format png "$1" --out "$2" 2>/dev/null; }
+_convert_linux() { heif-convert "$1" "$2" 2>/dev/null; }
+
+case "$(j::os)" in
+    macos) CONVERT_CMD=_convert_macos ;;
+    linux) j::require heif-convert; CONVERT_CMD=_convert_linux ;;
+esac
+
+_convert_file() {
+    local input="$1"
+    local output="${input%.*}.png"
+    [[ ! -f "$input" ]] && { j::error "File not found: $input"; return 1; }
+    [[ -f "$output" ]]  && { j::error "Output already exists: $output"; return 1; }
+    $CONVERT_CMD "$input" "$output" || { j::error "Failed to convert $input"; return 1; }
+    j::info "Converted: $input -> $output"
+}
+
+FAILED=0
+for FILE in "$@"; do
+    _convert_file "$FILE" || FAILED=1
+done
+exit "$FAILED"

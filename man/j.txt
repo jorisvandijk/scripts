@@ -1,0 +1,42 @@
+NAME
+    j - j-scripts shared library and CLI tooling
+
+SYNOPSIS
+    j <command> [args]
+
+    Commands:
+      list              List all available j-scripts with descriptions
+      new <jName>       Create a new script from the standard template
+      man <jName>       Open the man page for a script in $PAGER
+      newman <jName>    Create a new man page stub for a script
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+Every j-script sources j at startup. The library provides the logging
+helpers (j::info, j::warn, j::error, j::die), version printing, man page
+display, dependency checking (j::require), OS detection (j::os), and the
+editor/discard flow (j::edit_or_discard). Run directly, j acts as a small
+CLI for managing the collection.
+
+"j new" opens $EDITOR with a compliant template and only writes the file
+if it was changed. "j newman" works the same way for man page stubs.
+"j list" reads the description line from each script header at runtime,
+so there is no separate registry to keep in sync.
+
+EXAMPLES
+
+    j list
+        Print all j-scripts with their one-line descriptions.
+
+    j new jMyTool
+        Open a template for a new script called jMyTool.
+
+    j man jPush
+        Read the jPush man page in your pager.
+
+    j newman jMyTool
+        Open a man page stub for jMyTool in $EDITOR.

@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+#	jNix 1.1
+#	Navigate and edit nix configuration files
+#	Dependencies: fzf, bat, micro
+#	Usage: jNix [type]
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jNix" && exit 0
+
+j::require fzf bat micro
+
+NIX_DIR="$HOME/Git/nix"
+NIX_PACKAGES="${NIX_DIR}/system-packages.nix"
+NIX_HOMEBREW="${NIX_DIR}/system-homebrew.nix"
+NIX_SHELL="${NIX_DIR}/home-shell.nix"
+
+VALID_TYPES="pkg brew cask mas tap alias abbr gabbr var program file"
+TYPE_FILTER="${1:-all}"
+
+[[ "$TYPE_FILTER" != "all" && ! " $VALID_TYPES " =~ " $TYPE_FILTER " ]] && \
+    j::die "Unknown type '${TYPE_FILTER}'. Valid types: ${VALID_TYPES}"
+
+_parse_packages() {
+    [[ ! -f "$NIX_PACKAGES" ]] && return
+    grep -n '^\s\+[a-zA-Z_][a-zA-Z0-9_".-]*\s*$' "$NIX_PACKAGES" | \
+    while IFS=: read -r linenum name; do
+        name="${name//[[:space:]]/}"
+        name="${name//\"/}"
+        printf '[pkg]\t%-30s\t%s\t%s\n' "$name" "$NIX_PACKAGES" "$linenum"
+    done
+}
+
+_parse_homebrew() {
+    [[ ! -f "$NIX_HOMEBREW" ]] && return
+    awk '
+        /brews = \[/   { section="brew"; next }
+        /casks = \[/   { section="cask"; next }
+        /masApps = \{/ { section="mas";  next }
+        /taps = \[/    { section="tap";  next }
+        /^\s+[\]\}]/   { section="";    next }
+        section == "" { next }
+        /"[^"]+"/ {
+            n = split($0, a, "\"")
+            if (n >= 2) print section "\t" a[2] "\t" NR
+        }
+    ' "$NIX_HOMEBREW" | while IFS=$'\t' read -r section name linenum; do
+        printf '[%s]\t%-30s\t%s\t%s\n' "$section" "$name" "$NIX_HOMEBREW" "$linenum"
+    done
+}
+
+_parse_shell() {
+    [[ ! -f "$NIX_SHELL" ]] && return
+    awk '
+        /shellAliases = \{/          { section="alias"; next }
+        /zsh-abbr/                   { next }
+        /abbreviations = \{/         { section="abbr";  next }
+        /globalAbbreviations = \{/   { section="gabbr"; next }
+        /sessionVariables = \{/      { section="var";   next }
+        /^\s+\};/                    { section="";       next }
+        section == "" { next }
+        section == "var" && /[A-Z_]+ = "[^"]+"/ {
+            key = $0
+            gsub(/^[[:space:]]+/, "", key)
+            gsub(/[[:space:]]*=.*$/, "", key)
+            n = split($0, a, "\"")
+            if (n >= 2) print section "\t" key " = " a[2] "\t" NR
+            next
+        }
+        section != "var" && /"[^"]+" = / {
+            n = split($0, a, "\"")
+            if (n >= 4) print section "\t" a[2] " = " a[4] "\t" NR
+            else if (n >= 2) print section "\t" a[2] "\t" NR
+        }
+    ' "$NIX_SHELL" | while IFS=$'\t' read -r section display linenum; do
+        printf '[%s]\t%-30s\t%s\t%s\n' "$section" "$display" "$NIX_SHELL" "$linenum"
+    done
+}
+
+_parse_programs() {
+    local file name
+    for file in "${NIX_DIR}"/home-*.nix; do
+        [[ -f "$file" ]] || continue
+        name="${file##*/}"
+        name="${name#home-}"
+        name="${name%.nix}"
+        printf '[program]\t%-30s\t%s\t%s\n' "$name" "$file" "1"
+    done
+}
+
+_parse_files() {
+    local file
+    for file in "${NIX_DIR}"/*.nix; do
+        [[ -f "$file" ]] || continue
+        printf '[file]\t%-30s\t%s\t%s\n' "${file##*/}" "$file" "1"
+    done
+}
+
+_build_list() {
+    case "$TYPE_FILTER" in
+        pkg)     _parse_packages ;;
+        brew)    _parse_homebrew | grep $'^\\[brew\\]' ;;
+        cask)    _parse_homebrew | grep $'^\\[cask\\]' ;;
+        mas)     _parse_homebrew | grep $'^\\[mas\\]' ;;
+        tap)     _parse_homebrew | grep $'^\\[tap\\]' ;;
+        alias)   _parse_shell | grep $'^\\[alias\\]' ;;
+        abbr)    _parse_shell | grep $'^\\[abbr\\]' ;;
+        gabbr)   _parse_shell | grep $'^\\[gabbr\\]' ;;
+        var)     _parse_shell | grep $'^\\[var\\]' ;;
+        program) _parse_programs ;;
+        file)    _parse_files ;;
+        all)
+            _parse_packages
+            _parse_homebrew
+            _parse_shell
+            _parse_programs
+            _parse_files
+            ;;
+    esac
+}
+
+_prompt_rebuild() {
+    local answer
+    printf '\n'
+    j::info "Rebuild now? (sudo darwin-rebuild switch --flake ${NIX_DIR}/#macbook) [Y/n] "
+    read -r answer
+    case "${answer:-Y}" in
+        [Yy]*) sudo darwin-rebuild switch --flake "${NIX_DIR}/#macbook" ;;
+        *)     j::info "Skipped rebuild" ;;
+    esac
+}
+
+_open_in_editor() {
+    local file="$1" line="$2"
+    local mtime_before mtime_after
+    mtime_before="$(stat -f %m "$file")"
+    micro "+${line}" "$file"
+    mtime_after="$(stat -f %m "$file")"
+    [[ "$mtime_after" != "$mtime_before" ]]
+}
+
+SELECTION=$(_build_list | fzf \
+    --ansi \
+    --delimiter=$'\t' \
+    --with-nth=1,2 \
+    --prompt="Nix » " \
+    --height=80% \
+    --reverse \
+    --header="ENTER: edit" \
+    --preview='bat --color=always --style=numbers --highlight-line {4} {3}' \
+    --preview-window=right:60%:wrap:nofollow \
+)
+
+[[ -z "$SELECTION" ]] && exit 0
+
+FILE="$(printf '%s' "$SELECTION" | cut -f3)"
+LINE="$(printf '%s' "$SELECTION" | cut -f4)"
+_open_in_editor "$FILE" "$LINE" && _prompt_rebuild

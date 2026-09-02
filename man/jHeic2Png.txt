@@ -1,0 +1,26 @@
+NAME
+    jHeic2Png - convert HEIC images to PNG
+
+SYNOPSIS
+    jHeic2Png [options] <file> [file2 ...]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+Converts each given HEIC file to a PNG with the same name, written next
+to the source. The conversion uses sips on macOS and heif-convert on
+Linux (part of libheif-examples on Debian/Ubuntu). Existing files are
+never overwritten; if photo.png is already present, that conversion is
+skipped with an error. Multiple files are processed in one run, and the
+exit status is non-zero if any of them failed.
+
+EXAMPLES
+
+    jHeic2Png photo.heic
+        Produces photo.png next to the original.
+
+    jHeic2Png *.heic
+        Batch-convert everything in the current directory.

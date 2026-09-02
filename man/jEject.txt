@@ -1,0 +1,23 @@
+NAME
+    jEject - eject a mounted drive via fzf
+
+SYNOPSIS
+    jEject [options]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+Lists mounted external drives in fzf and ejects the selected one.
+Internal volumes are filtered out before the list is shown. On macOS the
+script uses diskutil for both listing and ejecting. On Linux it lists
+removable drives with lsblk and powers them off with udisksctl, falling
+back to eject if udisksctl is not installed. Pressing Escape or Ctrl-C
+exits without touching anything.
+
+EXAMPLES
+
+    jEject
+        Open the drive picker and eject the selected drive.

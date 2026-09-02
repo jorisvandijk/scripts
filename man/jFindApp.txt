@@ -1,0 +1,28 @@
+NAME
+    jFindApp - search for an app across App Store, Homebrew, and Nix
+
+SYNOPSIS
+    jFindApp [options] <name>
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+Searches for <name> in the Mac App Store (via mas), Homebrew (brew search),
+and Nix (nix search nixpkgs), and prints a one-line summary per store.
+
+Found packages are listed in green; "not found" is shown in red. If a
+required CLI is not installed, a yellow warning is shown for that store and
+the search continues with the others.
+
+Note: the first Nix search may be slow while the package index is fetched.
+
+EXAMPLES
+
+    jFindApp firefox
+        Search all three stores for "firefox".
+
+    jFindApp iterm
+        Search all three stores for "iterm".

@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#	jExtract 2.3
+#	Smart archive extraction
+#	Dependencies: tar, unzip, bunzip2, gunzip, unxz, 7zz
+#	Usage: jExtract <file>
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jExtract" && exit 0
+
+[[ -z "$1" ]]    && j::die "Usage: jExtract <file>"
+[[ ! -f "$1" ]]  && j::die "Not a valid file: '$1'"
+
+case "$1" in
+    *.tar.bz2)  j::require tar;     tar xvjf "$1"   ;;
+    *.tar.gz)   j::require tar;     tar xvzf "$1"   ;;
+    *.tar.xz)   j::require tar;     tar xvJf "$1"   ;;
+    *.bz2)      j::require bunzip2; bunzip2 "$1"    ;;
+    *.rar)      j::require 7zz;     7zz x "$1"      ;;
+    *.gz)       j::require gunzip;  gunzip "$1"     ;;
+    *.tar)      j::require tar;     tar xvf "$1"    ;;
+    *.tbz2)     j::require tar;     tar xvjf "$1"   ;;
+    *.tgz)      j::require tar;     tar xvzf "$1"   ;;
+    *.txz)      j::require tar;     tar xvJf "$1"   ;;
+    *.zip)      j::require unzip;   unzip "$1"      ;;
+    *.7z)       j::require 7zz;     7zz x "$1"      ;;
+    *.xz)       j::require unxz;    unxz "$1"       ;;
+    *)          j::die "Unknown archive format: '$1'" ;;
+esac

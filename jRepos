@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+#	jRepos 2.8
+#	Show git status of all repositories in ~/git
+#	Dependencies: git
+#	Usage: jRepos
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jRepos" && exit 0
+[[ -n "$1" ]]                             && j::die "Usage: jRepos (no arguments)"
+
+j::require git
+
+GIT_BASE_DIR="${HOME}/git"
+
+_count_states() {
+    local line index_status work_status
+    local conflicted=0 staged=0 modified=0 untracked=0
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        index_status="${line:0:1}" work_status="${line:1:1}"
+        [[ "$index_status" == "U" || "$work_status" == "U" || "$index_status$work_status" == "AA" || "$index_status$work_status" == "DD" ]] && { conflicted=$((conflicted + 1)); continue; }
+        [[ "$index_status" == [MADRC] ]] && staged=$((staged + 1))
+        [[ "$work_status" == "M" ]]      && modified=$((modified + 1))
+        [[ "$index_status$work_status" == "??" ]] && untracked=$((untracked + 1))
+    done
+    echo "$conflicted|$staged|$modified|$untracked"
+}
+
+_build_label() {
+    local conflicted="$1" staged="$2" modified="$3" untracked="$4" ahead="$5" behind="$6"
+    local parts=()
+    [[ "$conflicted" -gt 0 ]] && parts+=("$conflicted conflicted")
+    [[ "$staged"     -gt 0 ]] && parts+=("$staged staged")
+    [[ "$modified"   -gt 0 ]] && parts+=("$modified modified")
+    [[ "$untracked"  -gt 0 ]] && parts+=("$untracked untracked")
+    [[ "$ahead"      -gt 0 ]] && parts+=("ahead $ahead")
+    [[ "$behind"     -gt 0 ]] && parts+=("behind $behind")
+    echo "${parts[*]:-clean}"
+}
+
+_classify() {
+    local conflicted="$1" staged="$2" modified="$3" untracked="$4" ahead="$5" behind="$6"
+    [[ "$conflicted" -gt 0 ]]                                        && echo "conflict" && return
+    [[ "$ahead" -gt 0 || "$behind" -gt 0 ]]                          && echo "sync"     && return
+    [[ "$staged" -gt 0 || "$modified" -gt 0 || "$untracked" -gt 0 ]] && echo "dirty"    && return
+    echo "clean"
+}
+
+_print_group() {
+    local color="$1"; shift
+    local entry
+    for entry in "$@"; do
+        j::row "$color" "${entry%|*}" "${entry#*|}"
+    done
+}
+
+[[ ! -d "$GIT_BASE_DIR" ]] && j::die "Git directory not found: $GIT_BASE_DIR"
+
+CONFLICT_ENTRIES=() SYNC_ENTRIES=() DIRTY_ENTRIES=() CLEAN_ENTRIES=()
+
+for REPO_DIR in "$GIT_BASE_DIR"/*/; do
+    [[ -d "$REPO_DIR/.git" ]] || continue
+    REPO_NAME="${REPO_DIR%/}"
+    REPO_NAME="${REPO_NAME##*/}"
+
+    IFS='|' read -r CONFLICTED STAGED MODIFIED UNTRACKED <<< "$(git -C "$REPO_DIR" status --porcelain 2>/dev/null | _count_states)"
+    BEHIND=0 AHEAD=0
+    read -r BEHIND AHEAD < <(git -C "$REPO_DIR" rev-list --count --left-right @{upstream}...HEAD 2>/dev/null) || true
+    BEHIND="${BEHIND:-0}" AHEAD="${AHEAD:-0}"
+
+    LABEL=$(_build_label "$CONFLICTED" "$STAGED" "$MODIFIED" "$UNTRACKED" "$AHEAD" "$BEHIND")
+
+    case "$(_classify "$CONFLICTED" "$STAGED" "$MODIFIED" "$UNTRACKED" "$AHEAD" "$BEHIND")" in
+        conflict) CONFLICT_ENTRIES+=("$REPO_NAME|$LABEL") ;;
+        sync)     SYNC_ENTRIES+=("$REPO_NAME|$LABEL")     ;;
+        dirty)    DIRTY_ENTRIES+=("$REPO_NAME|$LABEL")    ;;
+        clean)    CLEAN_ENTRIES+=("$REPO_NAME|$LABEL")    ;;
+    esac
+done
+
+TOTAL=$(( ${#CONFLICT_ENTRIES[@]} + ${#SYNC_ENTRIES[@]} + ${#DIRTY_ENTRIES[@]} + ${#CLEAN_ENTRIES[@]} ))
+[[ "$TOTAL" -eq 0 ]] && j::info "No Git repositories found in: $GIT_BASE_DIR" && exit 0
+
+_print_group "$J_RED"    "${CONFLICT_ENTRIES[@]}"
+_print_group "$J_RED"    "${SYNC_ENTRIES[@]}"
+_print_group "$J_YELLOW" "${DIRTY_ENTRIES[@]}"
+_print_group "$J_GREEN"  "${CLEAN_ENTRIES[@]}"

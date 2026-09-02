@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+#	jGojo 1.0
+#	Build gojo for Linux and deploy it to the gojo server
+#	Dependencies: go, rsync, ssh
+#	Usage: jGojo
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jGojo" && exit 0
+[[ -n "$1" ]]                             && j::die "Usage: jGojo (no arguments)"
+
+j::require go rsync ssh
+
+GOJO_DIR="$HOME/git/gojo"
+GOJO_BINARY="gojo-linux"
+REMOTE_HOST="root@10.10.10.119"
+REMOTE_PATH="/opt/gojo/gojo"
+SERVICE_NAME="gojo"
+
+cd "$GOJO_DIR" || j::die "Could not cd to ${GOJO_DIR}"
+
+j::info "Building ${GOJO_BINARY} for linux/amd64"
+GOOS=linux GOARCH=amd64 go build -o "$GOJO_BINARY" . || j::die "Build failed"
+
+j::info "Uploading to ${REMOTE_HOST}:${REMOTE_PATH}"
+rsync -avh --info=progress2 --partial "$GOJO_BINARY" "${REMOTE_HOST}:${REMOTE_PATH}" || j::die "Upload failed"
+
+j::info "Restarting ${SERVICE_NAME} on ${REMOTE_HOST}"
+ssh "$REMOTE_HOST" "systemctl daemon-reload && systemctl restart ${SERVICE_NAME} && systemctl status ${SERVICE_NAME} --no-pager" \
+    || j::die "Remote restart failed - check the service on ${REMOTE_HOST}"
+
+j::info "Gojo deployed"

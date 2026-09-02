@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+#	jHugoHelper 2.6
+#	Hugo site helper: server, new post, new status
+#	Dependencies: hugo
+#	Usage: jHugoHelper {server|new|status} [post-name]
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jHugoHelper" && exit 0
+
+[[ -z "$1" ]] && j::die "Usage: jHugoHelper {server|new|status} [post-name]"
+
+j::require hugo
+
+WEBSITE_DIR="$HOME/git/website"
+
+_enter_website_dir() { cd "$WEBSITE_DIR" || j::die "Could not cd to $WEBSITE_DIR"; }
+
+case "$1" in
+    server)
+        _enter_website_dir
+        hugo server -D
+        rm "$WEBSITE_DIR/.hugo_build.lock" 2>/dev/null
+        ;;
+    new)
+        [[ -z "$2" ]] && j::die "Post name required - Usage: jHugoHelper new <post-name>"
+        _enter_website_dir
+        hugo new "posts/${2}.md" || j::die "Hugo could not create the post"
+        FILEPATH="content/posts/${2}.md"
+        j::edit_or_discard "$FILEPATH" || j::die "No changes - post discarded"
+        ;;
+    status)
+        _enter_website_dir
+        TIMESTAMP="$(date +%Y-%m-%d-%H%M%S)"
+        FILEPATH="content/microblog/${TIMESTAMP}.md"
+        [[ -e "$FILEPATH" ]] && j::die "Path already exists: ${FILEPATH}"
+        hugo new "microblog/${TIMESTAMP}.md" || j::die "Hugo could not create the status"
+        j::edit_or_discard "$FILEPATH" || j::die "No changes - status discarded"
+        ;;
+    *)
+        j::die "Usage: jHugoHelper {server|new|status} [post-name]"
+        ;;
+esac

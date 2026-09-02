@@ -1,0 +1,324 @@
+#!/usr/bin/env bash
+#	jTidy 1.1
+#	Audit the macOS home directory and guide an interactive cleanup
+#	Dependencies: fzf, brew, du, df, find
+#	Usage: jTidy
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+#
+# Flow: baseline -> discovery -> optional six-phase cleanup -> delta.
+#   Phase 1  always-safe items (Trash, caches, zsh state)   - batch confirm
+#   Phase 2  Homebrew autoremove + cleanup
+#   Phase 3  ~/Library/Caches                                - fzf multi-select
+#   Phase 4  Application Support + Containers                - fzf multi-select
+#   Phase 5  orphan ~/.config entries + dotfiles repo cleanup
+#   Phase 6  Time Machine local snapshots                   - sudo
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jTidy" && exit 0
+[[ -n "$1" ]]                             && j::die "Usage: jTidy (no arguments)"
+
+[[ "$(j::os)" == "macos" ]] || j::die "jTidy only supports macOS"
+
+j::require fzf brew du df find
+
+# ---- Display helpers ----
+_hdr()  { echo; echo "${J_BOLD}${J_CYAN}━━━ $1 ━━━${J_RESET}"; }
+_note() { echo "${J_DIM}$1${J_RESET}"; }
+_warn() { echo "${J_YELLOW}${J_BOLD}! $1${J_RESET}"; }
+_ok()   { echo "${J_GREEN}✓ $1${J_RESET}"; }
+_bad()  { echo "${J_RED}✗ $1${J_RESET}"; }
+
+_confirm() {
+    local answer
+    printf "${J_BOLD}%s [y/N]${J_RESET} " "${1:-Continue?}"
+    read -r answer
+    [[ "$answer" =~ ^[Yy]$ ]]
+}
+
+# ---- Size helpers ----
+_avail_bytes() { df -k / | awk 'NR==2 {print $4 * 1024}'; }
+_home_bytes()  { du -sk ~ 2>/dev/null | awk '{print $1 * 1024}'; }
+
+_bytes_hr() {
+    awk -v bytes="$1" 'BEGIN {
+        if (bytes >= 1099511627776) printf "%.1fT", bytes/1099511627776
+        else if (bytes >= 1073741824) printf "%.2fG", bytes/1073741824
+        else if (bytes >= 1048576)    printf "%.1fM", bytes/1048576
+        else if (bytes >= 1024)       printf "%.1fK", bytes/1024
+        else                          printf "%dB", bytes
+    }'
+}
+
+# ---- fzf selection over tab-delimited "size\tpath" lines ----
+_fzf_pick() {
+    local prompt="$1" header="$2"
+    fzf --multi \
+        --height=80% --border --reverse \
+        --delimiter=$'\t' \
+        --with-nth=1,2 \
+        --preview 'target={2}; if [[ -d "$target" ]]; then ls -lah "$target" 2>/dev/null | head -30; else file "$target" 2>/dev/null; fi' \
+        --preview-window=right:55%:wrap \
+        --prompt="$prompt> " \
+        --header="$header"
+}
+
+# ---- Deleters: consume tab-delimited "size\tpath" lines on stdin ----
+_delete_selected() {
+    local size path
+    while IFS=$'\t' read -r size path; do
+        [[ -n "$path" && -e "$path" ]] || continue
+        rm -rf "$path" 2>/dev/null && { _ok "Removed ($size): $path"; continue; }
+        _bad "Failed:  $path"
+    done
+}
+
+_delete_orphan_config() {
+    local size path name repo_path
+    while IFS=$'\t' read -r size path; do
+        [[ -n "$path" && -e "$path" ]] || continue
+        rm -rf "$path" && _ok "Removed ($size): $path"
+        name="${path##*/}"
+        repo_path="$HOME/git/macbook/$name"
+        [[ -e "$repo_path" ]] || continue
+        _confirm "  Also remove dotfiles repo entry $repo_path?" || continue
+        rm -rf "$repo_path" && _ok "  Removed: $repo_path"
+    done
+}
+
+_delete_snapshots() {
+    local snapshot
+    while read -r snapshot; do
+        [[ -n "$snapshot" ]] || continue
+        sudo tmutil deletelocalsnapshots "$snapshot" && { _ok "Deleted: $snapshot"; continue; }
+        _bad "Failed:  $snapshot"
+    done
+}
+
+# Review an fzf selection, confirm, then pipe it to the given deleter.
+_review_and_delete() {
+    local selected="$1" prompt="$2" deleter="${3:-_delete_selected}"
+    [[ -n "$selected" ]] || { _note "Skipped."; return; }
+    echo
+    echo "${J_BOLD}Marked for removal:${J_RESET}"
+    echo "$selected"
+    _confirm "$prompt" || return
+    printf '%s\n' "$selected" | "$deleter"
+}
+
+# ============================================================
+# DISCOVERY
+# ============================================================
+_baseline() {
+    _hdr "BASELINE"
+    df -h / | awk 'NR<=2'
+    echo "Home total: ${J_BOLD}$(_bytes_hr "$BEFORE_HOME")${J_RESET}"
+}
+
+# Titled "du -sh" report of the paths passed after the row count.
+_report_sizes() {
+    local title="$1" count="$2"; shift 2
+    _hdr "$title"
+    du -sh "$@" 2>/dev/null | sort -hr | head -"$count"
+}
+
+# Lowercased names of everything installed, for the orphan cross-reference.
+_installed_names() {
+    {
+        brew list --formula 2>/dev/null
+        brew list --cask 2>/dev/null
+        ls /Applications 2>/dev/null | sed 's/\.app$//'
+        ls ~/.local/bin 2>/dev/null
+        ls ~/.local/share 2>/dev/null
+    } | tr '[:upper:]' '[:lower:]'
+}
+
+# Print ~/.config cross-reference table (installed vs orphan).
+_report_config_cross_reference() {
+    local haystack="$1" dir name size lower
+    _hdr "~/.config CROSS-REFERENCE"
+    printf "  %-28s %-8s %s\n" "CONFIG" "SIZE" "STATUS"
+    for dir in ~/.config/*/; do
+        [[ -e "$dir" ]] || continue
+        name="${dir%/}"; name="${name##*/}"
+        size=$(du -sh "$dir" 2>/dev/null | awk '{print $1}')
+        lower=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')
+        if grep -qi -- "^${lower}\(-\|_\|$\)" <<< "$haystack"; then
+            printf "  %-28s %-8s ${J_GREEN}installed${J_RESET}\n" "$name" "$size"
+            continue
+        fi
+        printf "  %-28s %-8s ${J_YELLOW}ORPHAN?${J_RESET}\n" "$name" "$size"
+    done
+}
+
+# Populate ORPHAN_CONFIGS with ~/.config entries not matched in haystack.
+_collect_orphan_configs() {
+    local haystack="$1" dir name lower
+    for dir in ~/.config/*/; do
+        [[ -e "$dir" ]] || continue
+        name="${dir%/}"; name="${name##*/}"
+        lower=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')
+        grep -qi -- "^${lower}\(-\|_\|$\)" <<< "$haystack" && continue
+        ORPHAN_CONFIGS+=("$dir")
+    done
+}
+
+# Print Time Machine local snapshots.
+_report_snapshots() {
+    _hdr "TIME MACHINE SNAPSHOTS"
+    [[ ${#SNAPSHOT_NAMES[@]} -gt 0 ]] || { echo "  none"; return; }
+    printf '  %s\n' "${SNAPSHOT_NAMES[@]}"
+}
+
+# Populate SNAPSHOT_NAMES from tmutil output.
+_collect_snapshots() {
+    mapfile -t SNAPSHOT_NAMES < <(tmutil listlocalsnapshots / 2>/dev/null \
+        | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{6}' || true)
+}
+
+# ============================================================
+# CLEANUP PHASES
+# ============================================================
+_phase_safe_items() {
+    _hdr "PHASE 1 — Always-safe items"
+    local safe_dirs=( "$HOME/.Trash" "$HOME/.cache" "$HOME/.zsh_sessions" "$HOME/.zcompcache" )
+    local safe_files=( "$HOME/.DS_Store" )
+    shopt -s nullglob
+    safe_files+=( "$HOME"/.zcompdump-* )
+    shopt -u nullglob
+
+    local item bytes safe_total=0
+    for item in "${safe_dirs[@]}" "${safe_files[@]}"; do
+        [[ -e "$item" ]] || continue
+        bytes=$(du -sk "$item" 2>/dev/null | awk '{print $1 * 1024}')
+        printf "  %-45s %s\n" "$item" "$(_bytes_hr "$bytes")"
+        safe_total=$((safe_total + bytes))
+    done
+    echo "  ${J_BOLD}Reclaimable: ${J_GREEN}$(_bytes_hr "$safe_total")${J_RESET}"
+
+    _confirm "Clear all Phase 1 items?" || return
+    for item in "${safe_dirs[@]}"; do
+        [[ -d "$item" ]] || continue
+        echo "  Emptying $item..."
+        find "$item" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null
+    done
+    for item in "${safe_files[@]}"; do
+        [[ -e "$item" ]] && rm -f "$item"
+    done
+    _ok "Phase 1 complete."
+}
+
+_phase_homebrew() {
+    _hdr "PHASE 2 — Homebrew cleanup"
+    echo "  Runs: brew autoremove && brew cleanup --prune=all"
+    _confirm "Proceed?" || return
+    brew autoremove
+    brew cleanup --prune=all
+    _ok "Phase 2 complete."
+}
+
+_phase_caches() {
+    _hdr "PHASE 3 — ~/Library/Caches (multi-select)"
+    _note "TAB to mark, ENTER to confirm, ESC to skip."
+    local selected
+    selected=$(du -sh ~/Library/Caches/* 2>/dev/null | sort -hr | head -20 |
+        _fzf_pick "cache" "Select cache dirs to remove")
+    _review_and_delete "$selected" "Delete these?"
+}
+
+_phase_app_support() {
+    _hdr "PHASE 4 — Application Support + Containers"
+    _warn "These may contain game saves, app data, VM disks, wine bottles."
+    _warn "Removing is DESTRUCTIVE — consider Pearcleaner for app-associated removal."
+    echo
+    local selected
+    selected=$(
+        {
+            du -sh ~/Library/Application\ Support/* 2>/dev/null | sort -hr | head -15
+            du -sh ~/Library/Containers/*           2>/dev/null | sort -hr | head -10
+        } | sort -hr |
+        _fzf_pick "big" "Select items to REMOVE (be careful)"
+    )
+    _review_and_delete "$selected" "${J_RED}REALLY delete these?${J_RESET}"
+}
+
+_phase_orphan_configs() {
+    _hdr "PHASE 5 — Orphan ~/.config entries"
+    [[ ${#ORPHAN_CONFIGS[@]} -gt 0 ]] || { _ok "No orphan configs detected."; return; }
+    local dir size orphan_list="" selected
+    for dir in "${ORPHAN_CONFIGS[@]}"; do
+        dir="${dir%/}"
+        size=$(du -sh "$dir" 2>/dev/null | awk '{print $1}')
+        orphan_list+="${size}"$'\t'"${dir}"$'\n'
+    done
+    selected=$(printf '%s' "$orphan_list" | _fzf_pick "orphan" "Select orphan configs to remove")
+    _review_and_delete "$selected" "Delete these?" _delete_orphan_config
+}
+
+_phase_snapshots() {
+    [[ ${#SNAPSHOT_NAMES[@]} -gt 0 ]] || return
+    _hdr "PHASE 6 — Time Machine local snapshots"
+    _warn "Deletion requires sudo."
+    local selected
+    selected=$(printf '%s\n' "${SNAPSHOT_NAMES[@]}" |
+        fzf --multi --height=60% --border --reverse \
+            --prompt="snap> " \
+            --header="Select snapshots to delete (TAB, ENTER)")
+    [[ -n "$selected" ]] || { _note "Skipped."; return; }
+    _confirm "Delete selected snapshots (sudo)?" || return
+    printf '%s\n' "$selected" | _delete_snapshots
+}
+
+# ============================================================
+# RESULTS
+# ============================================================
+_results() {
+    _hdr "RESULTS"
+    local after_avail after_home home_freed disk_freed
+    after_avail=$(_avail_bytes)
+    after_home=$(_home_bytes)
+    home_freed=$((BEFORE_HOME - after_home))
+    disk_freed=$((after_avail - BEFORE_AVAIL))
+    printf "  %-18s %10s → %10s   ${J_GREEN}%s reclaimed${J_RESET}\n" \
+        "Home size" "$(_bytes_hr "$BEFORE_HOME")" "$(_bytes_hr "$after_home")" "$(_bytes_hr "$home_freed")"
+    printf "  %-18s %10s → %10s   ${J_GREEN}%s freed${J_RESET}\n" \
+        "Disk available" "$(_bytes_hr "$BEFORE_AVAIL")" "$(_bytes_hr "$after_avail")" "$(_bytes_hr "$disk_freed")"
+    echo
+    j::info "Done"
+}
+
+# ============================================================
+# MAIN FLOW
+# ============================================================
+declare -a ORPHAN_CONFIGS=()
+declare -a SNAPSHOT_NAMES=()
+BEFORE_AVAIL=$(_avail_bytes)
+BEFORE_HOME=$(_home_bytes)
+
+_baseline
+_report_sizes "TOP-LEVEL ~ (visible)" 10 ~/*
+_report_sizes "HIDDEN FILES IN ~" 15 ~/.??*
+_note "0B entries are usually Stow symlinks to ~/git/macbook/."
+_report_sizes "~/Library/Application Support (top 15)" 15 ~/Library/Application\ Support/*
+_report_sizes "~/Library/Containers (top 10)" 10 ~/Library/Containers/*
+_report_sizes "~/Library/Caches (top 15)" 15 ~/Library/Caches/*
+HAYSTACK=$(_installed_names)
+_report_config_cross_reference "$HAYSTACK"
+_collect_orphan_configs "$HAYSTACK"
+_collect_snapshots
+_report_snapshots
+
+echo
+_confirm "Continue to cleanup phase?" || { _ok "Audit only - no changes made."; exit 0; }
+
+_phase_safe_items
+_phase_homebrew
+_phase_caches
+_phase_app_support
+_phase_orphan_configs
+_phase_snapshots
+
+_results

@@ -1,0 +1,34 @@
+NAME
+    jHugoHelper - Hugo site helper
+
+SYNOPSIS
+    jHugoHelper [options] {server|new|status} [post-name]
+
+    Commands:
+      server          Start the Hugo development server with drafts enabled
+      new <name>      Create a new post and open it in $EDITOR
+      status          Create a new timestamped status entry and open it in $EDITOR
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+Three shortcuts for the Hugo site in ~/git/website. The server command
+starts the development server with drafts enabled and removes the build
+lock file when the server exits. The new command creates a post under
+content/posts/ and opens it in $EDITOR; if the file is closed without
+changes, it is deleted again. The status command does the same for a
+timestamped entry under content/microblog/.
+
+EXAMPLES
+
+    jHugoHelper server
+        Start the dev server at http://localhost:1313.
+
+    jHugoHelper new my-new-post
+        Create content/posts/my-new-post.md and open it in $EDITOR.
+
+    jHugoHelper status
+        Create a microblog entry for the current time and open it.

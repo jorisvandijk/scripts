@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+#	jEject 1.8
+#	Eject a mounted drive via fzf
+#	Dependencies: fzf, diskutil (macOS), lsblk, udisksctl or eject (Linux)
+#	Usage: jEject
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jEject" && exit 0
+[[ -n "$1" ]]                             && j::die "Usage: jEject (no arguments)"
+
+j::require fzf
+
+_list_drives_macos() {
+    j::require diskutil
+    diskutil list external | awk '
+        /^\/dev\// { dev=$1; next }
+        /^[[:space:]]+0:/ { print dev, $3, $4 }
+    '
+}
+
+_list_drives_linux() {
+    j::require lsblk
+    lsblk -d -n -o NAME,SIZE,LABEL,RM | awk '$4 == "1" {
+        label = ($3 == "" ? "(no label)" : $3)
+        print "/dev/"$1, $2, label
+    }'
+}
+
+_eject_macos() {
+    diskutil eject "$1"
+}
+
+_eject_linux() {
+    command -v udisksctl &>/dev/null && udisksctl power-off -b "$1" && return
+    eject "$1"
+}
+
+case "$(j::os)" in
+    macos) LIST_CMD=_list_drives_macos; EJECT_CMD=_eject_macos ;;
+    linux) LIST_CMD=_list_drives_linux; EJECT_CMD=_eject_linux ;;
+esac
+
+DRIVE_LIST=$($LIST_CMD)
+
+[[ -z "$DRIVE_LIST" ]] && j::die "No external drives found"
+
+SELECTED=$(fzf --prompt="Eject drive: " --height=40% --reverse --no-info <<< "$DRIVE_LIST") || exit 0
+
+DEVICE="${SELECTED%% *}"
+
+j::info "Ejecting $DEVICE ..."
+$EJECT_CMD "$DEVICE" || j::die "Failed to eject $DEVICE"
+j::info "Ejected $DEVICE"

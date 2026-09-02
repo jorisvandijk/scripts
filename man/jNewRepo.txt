@@ -1,0 +1,30 @@
+NAME
+    jNewRepo - initialize a local git repo and create it on multiple forges
+
+SYNOPSIS
+    jNewRepo [options] REPO_NAME REPO_PATH
+
+    Options:
+      -h, --help              Show this help
+      -v, --version           Show version
+      --private               Create the repo as private on all forges
+      --desc "description"    Set the repository description
+
+DESCRIPTION
+
+Creates the repository on GitHub, GitLab, Codeberg, and Bitbucket, then
+initializes a local repo in REPO_PATH with all four forges configured
+as push remotes.
+
+Before creating anything, the script validates all four API tokens and
+verifies that no repository with that name exists on any of the forges.
+If any check fails, it stops without creating a single thing.
+Credentials are read from ~/git/documents/newrepo/config.
+
+EXAMPLES
+
+    jNewRepo my-project ~/code/my-project
+        Initialize ~/code/my-project and create a public repo on all four forges.
+
+    jNewRepo --private --desc "Secret stuff" secret-project ~/code/secret
+        The same, but private and with a description.

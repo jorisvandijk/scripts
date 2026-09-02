@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+#	jPush 2.8
+#	Stage, commit, and push to Git
+#	Dependencies: git
+#	Usage: jPush
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jPush" && exit 0
+[[ -n "$1" ]]                             && j::die "Usage: jPush (no arguments)"
+
+j::require git
+
+_cleanup() {
+    j::warn "Undoing staged changes"
+    git reset &>/dev/null || true
+    j::warn "Changes have been unstaged - working directory left intact"
+    exit 1
+}
+
+_push_with_upstream() {
+    local current_branch
+    current_branch="$(git rev-parse --abbrev-ref HEAD)"
+    [[ -z "$current_branch" ]] && { j::error "Unable to determine current branch"; _cleanup; }
+    j::warn "Push failed - no upstream branch set for '$current_branch'"
+    git push --set-upstream origin "$current_branch" || { j::error "Failed to push after setting upstream"; _cleanup; }
+    j::info "Upstream set and changes pushed"
+}
+
+trap _cleanup INT
+
+j::info "Staging changes"
+git add . || j::die "Failed to stage changes"
+
+j::info "Git status:"
+git status
+
+echo
+j::info "Enter commit message (or press Ctrl+C to cancel):"
+read -r COMMIT_MSG
+
+[[ -z "$COMMIT_MSG" ]] && j::die "Commit message cannot be empty"
+
+j::info "Committing changes"
+git commit -m "$COMMIT_MSG" || _cleanup
+
+j::info "Pushing changes"
+git push && { j::info "Changes committed and pushed"; exit 0; }
+
+_push_with_upstream

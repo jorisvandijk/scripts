@@ -1,0 +1,20 @@
+NAME
+    jOpenFzf - select files with fzf and open them in micro
+
+SYNOPSIS
+    jOpenFzf [options]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+Starts fzf in the home directory with a bat preview pane. Multiple
+files can be selected with Tab; all selected files are then opened
+together in micro. Escape or Ctrl-C exits without opening anything.
+
+EXAMPLES
+
+    jOpenFzf
+        Browse, pick files, open them in micro.

@@ -1,0 +1,21 @@
+NAME
+    jPush - stage, commit, and push to Git
+
+SYNOPSIS
+    jPush [options]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+Stages all changes, shows git status, prompts for a commit message,
+commits, and pushes. If the branch has no upstream yet, the script sets
+one with --set-upstream and pushes again. Ctrl-C at any point unstages
+everything and leaves the working directory as it was.
+
+EXAMPLES
+
+    jPush
+        Stage, commit, and push in one go.

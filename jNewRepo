@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+#	jNewRepo 2.4
+#	Initialize a local git repo and create it on GitHub, GitLab, Codeberg, and Bitbucket
+#	Dependencies: git, curl
+#	Usage: jNewRepo [--private] [--desc "description"] REPO_NAME REPO_PATH
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jNewRepo" && exit 0
+
+j::require git curl
+
+PRIVATE=false
+DESCRIPTION=""
+LABEL_WIDTH=16
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --private) PRIVATE=true; shift ;;
+        --desc)    DESCRIPTION="$2"; shift 2 ;;
+        --)        shift; break ;;
+        -*)        j::die "Unknown option: $1" ;;
+        *)         break ;;
+    esac
+done
+
+[[ $# -ne 2 ]] && j::die "Usage: jNewRepo [--private] [--desc 'description'] REPO_NAME REPO_PATH"
+
+REPO_NAME="$1"
+REPO_PATH="$2"
+
+CONFIG_FILE="$HOME/git/documents/newrepo/config"
+
+[[ ! -f "$CONFIG_FILE" ]] && j::die "Config file not found at ${CONFIG_FILE} - create it with GITHUB_TOKEN, GITLAB_TOKEN, CODEBERG_TOKEN, BITBUCKET_WORKSPACE, BITBUCKET_EMAIL, BITBUCKET_API_TOKEN"
+
+source "$CONFIG_FILE"
+
+[[ ! -d "$REPO_PATH" ]]    && j::die "Directory '$REPO_PATH' does not exist"
+[[ -d "$REPO_PATH/.git" ]] && j::die "Directory '$REPO_PATH' already has a .git directory"
+
+PREFLIGHT_FAILED=false
+
+_check_auth() {
+    local label; label="$(printf '%-*s' "$LABEL_WIDTH" "$1")"
+    local url="$2"; shift 2
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" "$@" "$url")
+    [[ "$code" == "200" ]] && return 0
+    j::error "$label invalid credentials (HTTP $code)"; return 1
+}
+
+_check_exists() {
+    local label; label="$(printf '%-*s' "$LABEL_WIDTH" "$1")"
+    local url="$2"; shift 2
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" "$@" "$url")
+    case "$code" in
+        404) j::info  "$label ok";               return 0 ;;
+        200) j::error "$label already exists";   return 1 ;;
+        *)   j::error "$label unexpected HTTP $code"; return 1 ;;
+    esac
+}
+
+j::info "Preflight checks for '$REPO_NAME'..."
+_check_auth   "GitHub auth" https://api.github.com/user \
+    -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
+    || PREFLIGHT_FAILED=true
+_check_exists "GitHub repo" "https://api.github.com/repos/jorisvandijk/$REPO_NAME" \
+    -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
+    || PREFLIGHT_FAILED=true
+_check_auth   "GitLab auth" https://gitlab.com/api/v4/user \
+    -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+    || PREFLIGHT_FAILED=true
+_check_exists "GitLab repo" "https://gitlab.com/api/v4/projects/jorisvandijk%2F$REPO_NAME" \
+    -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+    || PREFLIGHT_FAILED=true
+_check_auth   "Codeberg auth" https://codeberg.org/api/v1/user \
+    -H "Authorization: token $CODEBERG_TOKEN" \
+    || PREFLIGHT_FAILED=true
+_check_exists "Codeberg repo" "https://codeberg.org/api/v1/repos/jorisvandijk/$REPO_NAME" \
+    -H "Authorization: token $CODEBERG_TOKEN" \
+    || PREFLIGHT_FAILED=true
+_check_auth   "Bitbucket auth" https://api.bitbucket.org/2.0/user \
+    -u "$BITBUCKET_EMAIL:$BITBUCKET_API_TOKEN" \
+    || PREFLIGHT_FAILED=true
+_check_exists "Bitbucket repo" "https://api.bitbucket.org/2.0/repositories/$BITBUCKET_WORKSPACE/$REPO_NAME" \
+    -u "$BITBUCKET_EMAIL:$BITBUCKET_API_TOKEN" \
+    || PREFLIGHT_FAILED=true
+
+[[ "$PREFLIGHT_FAILED" == true ]] && j::die "Preflight failed - nothing was created"
+
+j::info "Creating remote repositories..."
+
+_create_repo() {
+    local label; label="$(printf '%-*s' "$LABEL_WIDTH" "$1")"
+    local url="$2" body="$3"; shift 3
+    local tmpfile; tmpfile="$(mktemp)"
+    local http_code msg
+    http_code=$(curl -s -o "$tmpfile" -w "%{http_code}" -X POST "$@" -d "$body" "$url")
+    [[ "$http_code" == "200" || "$http_code" == "201" ]] || {
+        msg=$(grep -o '"message":"[^"]*"' "$tmpfile" 2>/dev/null | head -1 | cut -d'"' -f4)
+        j::error "$label failed (HTTP $http_code: $msg)"
+        rm -f "$tmpfile"
+        return 1
+    }
+    j::info "$label ok"
+    rm -f "$tmpfile"
+}
+
+PRIVATE_VAL="false"; VISIBILITY="public"
+[[ "$PRIVATE" == true ]] && PRIVATE_VAL="true" && VISIBILITY="private"
+
+_create_repo "GitHub" https://api.github.com/user/repos \
+    "{\"name\":\"$REPO_NAME\",\"description\":\"$DESCRIPTION\",\"private\":$PRIVATE_VAL}" \
+    -H "Authorization: Bearer $GITHUB_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    -H "X-GitHub-Api-Version: 2022-11-28" || exit 1
+
+_create_repo "GitLab" https://gitlab.com/api/v4/projects \
+    "{\"name\":\"$REPO_NAME\",\"description\":\"$DESCRIPTION\",\"visibility\":\"$VISIBILITY\",\"initialize_with_readme\":false}" \
+    -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+    -H "Content-Type: application/json" || exit 1
+
+_create_repo "Codeberg" https://codeberg.org/api/v1/user/repos \
+    "{\"name\":\"$REPO_NAME\",\"description\":\"$DESCRIPTION\",\"private\":$PRIVATE_VAL,\"auto_init\":false}" \
+    -H "Authorization: token $CODEBERG_TOKEN" \
+    -H "Content-Type: application/json" || exit 1
+
+_create_repo "Bitbucket" "https://api.bitbucket.org/2.0/repositories/$BITBUCKET_WORKSPACE/$REPO_NAME" \
+    "{\"scm\":\"git\",\"is_private\":$PRIVATE_VAL,\"description\":\"$DESCRIPTION\"}" \
+    -u "$BITBUCKET_EMAIL:$BITBUCKET_API_TOKEN" \
+    -H "Content-Type: application/json" || exit 1
+
+_init_local_repo() {
+    local path="$1"
+    cd "$path" || j::die "Could not cd to $path"
+    git init
+    git branch -M main
+    git remote add origin git@bitbucket.org:"$BITBUCKET_WORKSPACE"/"$REPO_NAME".git
+    git remote set-url --add --push origin git@bitbucket.org:"$BITBUCKET_WORKSPACE"/"$REPO_NAME".git
+    git remote set-url --add --push origin git@github.com:jorisvandijk/"$REPO_NAME".git
+    git remote set-url --add --push origin git@gitlab.com:jorisvandijk/"$REPO_NAME".git
+    git remote set-url --add --push origin git@codeberg.org:jorisvandijk/"$REPO_NAME".git
+}
+
+j::info "Initializing local repository in '$REPO_PATH'..."
+_init_local_repo "$REPO_PATH"
+j::info "Done. Run 'git push origin main' after your first commit."

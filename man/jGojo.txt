@@ -1,0 +1,27 @@
+NAME
+    jGojo - build gojo for Linux and deploy it to the gojo server
+
+SYNOPSIS
+    jGojo [options]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+Deploys the gojo project in three steps. First it cross-compiles the
+source in ~/git/gojo for linux/amd64 into a gojo-linux binary. Then it
+uploads that binary with rsync to root@10.10.10.119:/opt/gojo/gojo,
+renaming it to gojo in the process. Finally it connects over ssh and
+runs systemctl daemon-reload, restarts the gojo service, and prints its
+status.
+
+The locations (local project directory, binary name, remote host,
+remote path, and service name) are defined as variables at the top of
+the script.
+
+EXAMPLES
+
+    jGojo
+        Build, upload, and restart the gojo service on the server.

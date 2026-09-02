@@ -1,0 +1,44 @@
+NAME
+    jTidy - audit the macOS home directory and guide an interactive cleanup
+
+SYNOPSIS
+    jTidy [options]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+Audits the home directory and then walks through an optional, confirm-at-
+every-step cleanup. macOS only.
+
+It starts with a baseline (disk free plus total home size) and a discovery
+report: the largest visible and hidden entries in ~, the biggest folders in
+~/Library/Application Support, ~/Library/Containers and ~/Library/Caches, a
+cross-reference of ~/.config against installed formulae, casks and apps to
+flag likely orphans, and any Time Machine local snapshots.
+
+If you choose to continue, cleanup runs in six phases, each gated by its own
+confirmation:
+
+    Phase 1  Always-safe items - empties ~/.Trash, ~/.cache, ~/.zsh_sessions,
+             ~/.zcompcache and removes stray ~/.DS_Store and ~/.zcompdump-*
+             files, after showing the reclaimable total.
+    Phase 2  Homebrew - brew autoremove followed by brew cleanup --prune=all.
+    Phase 3  ~/Library/Caches - fzf multi-select removal of cache folders.
+    Phase 4  Application Support and Containers - fzf multi-select removal of
+             app data (destructive: may hold game saves, VM disks, bottles).
+    Phase 5  Orphan ~/.config entries - fzf multi-select removal, with an
+             optional matching cleanup of the ~/git/macbook dotfiles repo.
+    Phase 6  Time Machine local snapshots - fzf multi-select deletion (sudo).
+
+It finishes with a delta showing home size and disk free before and after.
+
+Nothing is deleted without a prompt, and answering no at the first cleanup
+prompt turns the run into an audit-only report.
+
+EXAMPLES
+
+    jTidy
+        Run the audit, then optionally walk through the cleanup phases.

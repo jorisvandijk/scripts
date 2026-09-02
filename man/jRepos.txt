@@ -1,0 +1,22 @@
+NAME
+    jRepos - show git status of all repositories
+
+SYNOPSIS
+    jRepos [options]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+Scans every subdirectory of ~/git for a .git folder and prints a
+color-coded table. Red marks repositories that need attention, either
+merge conflicts or being out of sync with the remote. Yellow marks
+repositories with local-only changes. Green means clean. Each row shows
+the repository name and a short summary of its state.
+
+EXAMPLES
+
+    jRepos
+        Print the status table for all repos in ~/git.

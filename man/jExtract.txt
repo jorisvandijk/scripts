@@ -1,0 +1,28 @@
+NAME
+    jExtract - smart archive extraction
+
+SYNOPSIS
+    jExtract [options] <file>
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+Picks the right extraction tool based on the file extension. Supported
+formats: tar.bz2, tar.gz, tar.xz, bz2, rar, gz, tar, tbz2, tgz, txz,
+zip, 7z, and xz. RAR and 7z archives are handled by 7zz, plain .xz
+files by unxz, and the rest by the standard tools. Archives are
+extracted into the current directory.
+
+EXAMPLES
+
+    jExtract archive.tar.gz
+        Extract into the current directory.
+
+    jExtract mods.zip
+        Extract a zip archive.
+
+    jExtract backup.tar.bz2
+        Extract a bzip2 tarball.
