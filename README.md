@@ -202,10 +202,3 @@ Add every new script to the `## Scripts` table below.
 Run `j list` for live descriptions parsed from each script's header.
 
 ---
-
-## Raycast scripts
-
-The `raycast/` directory holds Raycast script commands (game and app
-launchers). Their format is dictated by Raycast, so the j-script rules
-above do not apply to them. They have no man pages and are not listed
-by `j list`.
