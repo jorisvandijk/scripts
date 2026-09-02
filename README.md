@@ -202,3 +202,11 @@ Add every new script to the `## Scripts` table below.
 Run `j list` for live descriptions parsed from each script's header.
 
 ---
+
+## License
+
+Unless otherwise noted, all files in this repository are licensed under the MIT license.
+
+You are free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the software, with or without modification, provided the original copyright notice and this permission notice are included.
+
+[MIT License](https://opensource.org/licenses/MIT)
