@@ -184,6 +184,7 @@ Add every new script to the `## Scripts` table below.
 | Script | Description |
 |---|---|
 | `j` | j-scripts shared library and CLI tooling |
+| `jBlog` | Write and publish a Hugo blog post |
 | `jEject` | Eject a mounted drive via fzf |
 | `jFindApp` | Search for an app across App Store, Homebrew, and Nix |
 | `jExtract` | Smart archive extraction |

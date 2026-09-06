@@ -1,0 +1,30 @@
+NAME
+    jBlog - write and publish a Hugo blog post
+
+SYNOPSIS
+    jBlog [options]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+Full write-to-publish workflow for the Hugo blog at ~/git/website. Drafts
+are stored in content/posts/_drafts/ (excluded from Hugo builds by Hugo's
+underscore convention) and moved to content/posts/ on completion.
+
+Running jBlog with an existing draft resumes that draft instead of
+creating a new one — the draft stays in _drafts/ until you supply a title
+and finish the post. Closing the Zed window signals that writing is done;
+the script then prompts for the post title, renames and moves the file
+to content/posts/<slug>.md, sets draft: false in the front matter, and
+optionally commits and pushes to git.
+
+Interrupting the script (Ctrl+C) at any point kills the Hugo server and
+leaves the draft intact for the next session.
+
+EXAMPLES
+
+    jBlog
+        Start a new post or resume the in-progress draft.

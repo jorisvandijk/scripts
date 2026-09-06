@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+#	jBlog 1.0
+#	Write and publish a Hugo blog post
+#	Dependencies: hugo, zeditor, git
+#	Usage: jBlog
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jBlog" && exit 0
+[[ -n "$1" ]]                             && j::die "Usage: jBlog (no arguments)"
+
+WEBSITE_DIR="$HOME/git/website"
+HUGO_PID=""
+TITLE=""
+DEST=""
+DRAFT_FILE=""
+
+_preflight() {
+    j::require hugo git
+    command -v zeditor &>/dev/null || j::die "zeditor is not on PATH"
+    cd "$WEBSITE_DIR" || j::die "Could not cd to $WEBSITE_DIR"
+}
+
+_find_draft() {
+    shopt -s nullglob
+    local drafts=("$WEBSITE_DIR/content/posts/_drafts/"*.md)
+    shopt -u nullglob
+    [[ ${#drafts[@]} -gt 0 ]] && echo "${drafts[0]}"
+}
+
+_create_draft() {
+    mkdir -p "$WEBSITE_DIR/content/posts/_drafts"
+    local timestamp; timestamp="$(date +%Y%m%d%H%M%S)"
+    local rel_path="posts/_drafts/untitled-${timestamp}.md"
+    hugo new "$rel_path" >&2 || j::die "Hugo could not create the draft"
+    echo "$WEBSITE_DIR/content/$rel_path"
+}
+
+_cleanup() {
+    [[ -n "$HUGO_PID" ]] && kill "$HUGO_PID" 2>/dev/null
+    rm -f "$WEBSITE_DIR/.hugo_build.lock" 2>/dev/null
+}
+
+_start_server() {
+    if lsof -i :1313 -sTCP:LISTEN &>/dev/null; then
+        j::info "Hugo server already running on :1313"
+        open "http://localhost:1313"
+        return
+    fi
+    hugo server -D &>/dev/null &
+    HUGO_PID=$!
+    j::info "Starting Hugo server..."
+    local attempts=0
+    while ! lsof -i :1313 -sTCP:LISTEN &>/dev/null; do
+        sleep 0.3
+        attempts=$((attempts + 1))
+        [[ $attempts -gt 30 ]] && j::die "Hugo server failed to start"
+    done
+    open "http://localhost:1313"
+}
+
+_slugify() {
+    local title="$1"
+    local slug="${title,,}"
+    slug="${slug// /-}"
+    slug="${slug//[^a-z0-9-]/}"
+    echo "$slug"
+}
+
+_update_front_matter() {
+    local draft_file="$1"
+    local title="$2"
+    sed -i '' "s|^title:.*|title: \"${title}\"|" "$draft_file"
+    sed -i '' 's/^draft: true/draft: false/' "$draft_file"
+}
+
+_finish_post() {
+    local draft_file="$1"
+    while [[ -z "$TITLE" ]]; do
+        read -r -p "Post title: " TITLE
+    done
+    local slug; slug="$(_slugify "$TITLE")"
+    DEST="$WEBSITE_DIR/content/posts/${slug}.md"
+    [[ -e "$DEST" ]] && j::die "A post already exists at ${DEST} — draft preserved at ${draft_file}"
+    _update_front_matter "$draft_file" "$TITLE"
+    mv "$draft_file" "$DEST"
+    j::info "Post saved: $DEST"
+}
+
+_push() {
+    local push_answer
+    read -r -p "Push to git? [Y/n] " push_answer
+    [[ "${push_answer,,}" == "n" ]] && return 0
+    git add "$DEST" || j::die "Failed to stage post"
+    git commit -m "Add post: ${TITLE}" || j::die "Failed to commit post"
+    git push || j::die "Failed to push post"
+    j::info "Post published"
+}
+
+_preflight
+
+DRAFT_FILE="$(_find_draft)"
+
+[[ -z "$DRAFT_FILE" ]] && DRAFT_FILE="$(_create_draft)"
+
+trap _cleanup EXIT
+
+_start_server
+
+j::info "Opening draft in Zed — close the window when done writing"
+zeditor --wait "$DRAFT_FILE"
+
+_finish_post "$DRAFT_FILE"
+_push
