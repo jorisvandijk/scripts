@@ -1,0 +1,22 @@
+NAME
+    jLxc - Toggle Proxmox LXC containers on/off
+
+SYNOPSIS
+    jLxc [options]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+Connects to a Proxmox server via SSH and lists all LXC containers with
+their current status (running or stopped). Select a container using fzf
+to toggle it: running containers are stopped, stopped containers are started.
+
+Press Esc in the fzf picker to exit without making changes.
+
+EXAMPLES
+
+    jLxc
+        List all containers and select one to toggle.

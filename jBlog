@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #	jBlog 1.0
 #	Write and publish a Hugo blog post
-#	Dependencies: hugo, zeditor, git
+#	Dependencies: hugo, zeditor, fzf, git
 #	Usage: jBlog
 #
 #	By Joris van Dijk | Jorisvandijk.com
@@ -20,22 +20,21 @@ DEST=""
 DRAFT_FILE=""
 
 _preflight() {
-    j::require hugo git
+    j::require hugo git fzf
     command -v zeditor &>/dev/null || j::die "zeditor is not on PATH"
     cd "$WEBSITE_DIR" || j::die "Could not cd to $WEBSITE_DIR"
 }
 
 _find_draft() {
     shopt -s nullglob
-    local drafts=("$WEBSITE_DIR/content/posts/_drafts/"*.md)
+    local drafts=("$WEBSITE_DIR/content/posts/untitled-"*.md)
     shopt -u nullglob
     [[ ${#drafts[@]} -gt 0 ]] && echo "${drafts[0]}"
 }
 
 _create_draft() {
-    mkdir -p "$WEBSITE_DIR/content/posts/_drafts"
     local timestamp; timestamp="$(date +%Y%m%d%H%M%S)"
-    local rel_path="posts/_drafts/untitled-${timestamp}.md"
+    local rel_path="posts/untitled-${timestamp}.md"
     hugo new "$rel_path" >&2 || j::die "Hugo could not create the draft"
     echo "$WEBSITE_DIR/content/$rel_path"
 }
@@ -46,21 +45,22 @@ _cleanup() {
 }
 
 _start_server() {
-    if lsof -i :1313 -sTCP:LISTEN &>/dev/null; then
-        j::info "Hugo server already running on :1313"
-        open "http://localhost:1313"
-        return
+    local slug; slug="$(basename "$DRAFT_FILE" .md)"
+    local url="http://localhost:1313/posts/${slug}/"
+
+    if ! lsof -i :1313 -sTCP:LISTEN &>/dev/null; then
+        hugo server -D &>/dev/null &
+        HUGO_PID=$!
+        j::info "Starting Hugo server..."
     fi
-    hugo server -D &>/dev/null &
-    HUGO_PID=$!
-    j::info "Starting Hugo server..."
+
     local attempts=0
-    while ! lsof -i :1313 -sTCP:LISTEN &>/dev/null; do
+    until curl -sf "$url" &>/dev/null; do
         sleep 0.3
         attempts=$((attempts + 1))
-        [[ $attempts -gt 30 ]] && j::die "Hugo server failed to start"
+        [[ $attempts -gt 60 ]] && j::die "Hugo server failed to start"
     done
-    open "http://localhost:1313"
+    open "$url"
 }
 
 _slugify() {
@@ -74,8 +74,10 @@ _slugify() {
 _update_front_matter() {
     local draft_file="$1"
     local title="$2"
+    local now; now="$(date "+%Y-%m-%dT%H:%M:%S%z" | sed 's/\([+-][0-9][0-9]\)\([0-9][0-9]\)$/\1:\2/')"
     sed -i '' "s|^title:.*|title: \"${title}\"|" "$draft_file"
-    sed -i '' 's/^draft: true/draft: false/' "$draft_file"
+    sed -i '' "s|^date:.*|date: ${now}|"         "$draft_file"
+    sed -i '' 's/^draft: true/draft: false/'      "$draft_file"
 }
 
 _finish_post() {
@@ -89,6 +91,39 @@ _finish_post() {
     _update_front_matter "$draft_file" "$TITLE"
     mv "$draft_file" "$DEST"
     j::info "Post saved: $DEST"
+}
+
+_select_tags() {
+    local existing
+    existing="$(grep -h "^tags:" "$WEBSITE_DIR/content/posts/"*.md 2>/dev/null \
+        | sed 's/tags: \[//; s/\]//; s/"//g; s/ //g' \
+        | tr ',' '\n' | sort -u | grep -v '^$')"
+
+    local chosen=""
+    [[ -n "$existing" ]] && chosen="$(echo "$existing" \
+        | fzf --multi --prompt="Select tags (Tab toggles, Enter confirms, Esc skips): " \
+              --height=~40% --layout=reverse 2>/dev/null)" || chosen=""
+
+    local new_input=""
+    read -r -p "New tags (space-separated, Enter to skip): " new_input
+
+    local all_tags=()
+    local tag
+    while IFS= read -r tag; do
+        [[ -n "$tag" ]] && all_tags+=("$tag")
+    done <<< "$chosen"
+    for tag in $new_input; do
+        [[ -n "$tag" ]] && all_tags+=("$tag")
+    done
+
+    local tags_str=""
+    for tag in "${all_tags[@]}"; do
+        tags_str+="\"${tag}\", "
+    done
+    tags_str="${tags_str%, }"
+
+    sed -i '' "s|^tags:.*|tags: [${tags_str}]|" "$DEST"
+    [[ ${#all_tags[@]} -gt 0 ]] && j::info "Tags: ${tags_str}"
 }
 
 _push() {
@@ -115,4 +150,5 @@ j::info "Opening draft in Zed — close the window when done writing"
 zeditor --wait "$DRAFT_FILE"
 
 _finish_post "$DRAFT_FILE"
+_select_tags
 _push
