@@ -2,6 +2,7 @@
 #	jPush 2.8
 #	Stage, commit, and push to Git
 #	Dependencies: git
+#	Keywords: commit, push, git, upload, stage, sync
 #	Usage: jPush
 #
 #	By Joris van Dijk | Jorisvandijk.com

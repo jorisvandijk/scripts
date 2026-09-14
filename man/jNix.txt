@@ -48,3 +48,7 @@ EXAMPLES
 
     jNix cask
         Browse Homebrew casks; select one to edit system-homebrew.nix.
+
+KEYWORDS
+
+    nix, configuration, nixos, packages, edit config

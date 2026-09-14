@@ -2,6 +2,7 @@
 #	jTidy 1.1
 #	Audit the macOS home directory and guide an interactive cleanup
 #	Dependencies: fzf, brew, du, df, find
+#	Keywords: cleanup, organize, home directory, dotfiles, audit, declutter
 #	Usage: jTidy
 #
 #	By Joris van Dijk | Jorisvandijk.com
@@ -146,10 +147,10 @@ _report_config_cross_reference() {
         name="${dir%/}"; name="${name##*/}"
         size=$(du -sh "$dir" 2>/dev/null | awk '{print $1}')
         lower=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')
-        if grep -qi -- "^${lower}\(-\|_\|$\)" <<< "$haystack"; then
+        grep -qi -- "^${lower}\(-\|_\|$\)" <<< "$haystack" && {
             printf "  %-28s %-8s ${J_GREEN}installed${J_RESET}\n" "$name" "$size"
             continue
-        fi
+        }
         printf "  %-28s %-8s ${J_YELLOW}ORPHAN?${J_RESET}\n" "$name" "$size"
     done
 }
@@ -182,6 +183,33 @@ _collect_snapshots() {
 # ============================================================
 # CLEANUP PHASES
 # ============================================================
+_safe_item_sizes() {
+    local item bytes safe_total=0
+    for item in "$@"; do
+        [[ -e "$item" ]] || continue
+        bytes=$(du -sk "$item" 2>/dev/null | awk '{print $1 * 1024}')
+        printf "  %-45s %s\n" "$item" "$(_bytes_hr "$bytes")"
+        safe_total=$((safe_total + bytes))
+    done
+    echo "  ${J_BOLD}Reclaimable: ${J_GREEN}$(_bytes_hr "$safe_total")${J_RESET}"
+}
+
+_purge_dirs() {
+    local item
+    for item in "$@"; do
+        [[ -d "$item" ]] || continue
+        echo "  Emptying $item..."
+        find "$item" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null
+    done
+}
+
+_purge_files() {
+    local item
+    for item in "$@"; do
+        [[ -e "$item" ]] && rm -f "$item"
+    done
+}
+
 _phase_safe_items() {
     _hdr "PHASE 1 — Always-safe items"
     local safe_dirs=( "$HOME/.Trash" "$HOME/.cache" "$HOME/.zsh_sessions" "$HOME/.zcompcache" )
@@ -190,24 +218,10 @@ _phase_safe_items() {
     safe_files+=( "$HOME"/.zcompdump-* )
     shopt -u nullglob
 
-    local item bytes safe_total=0
-    for item in "${safe_dirs[@]}" "${safe_files[@]}"; do
-        [[ -e "$item" ]] || continue
-        bytes=$(du -sk "$item" 2>/dev/null | awk '{print $1 * 1024}')
-        printf "  %-45s %s\n" "$item" "$(_bytes_hr "$bytes")"
-        safe_total=$((safe_total + bytes))
-    done
-    echo "  ${J_BOLD}Reclaimable: ${J_GREEN}$(_bytes_hr "$safe_total")${J_RESET}"
-
+    _safe_item_sizes "${safe_dirs[@]}" "${safe_files[@]}"
     _confirm "Clear all Phase 1 items?" || return
-    for item in "${safe_dirs[@]}"; do
-        [[ -d "$item" ]] || continue
-        echo "  Emptying $item..."
-        find "$item" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null
-    done
-    for item in "${safe_files[@]}"; do
-        [[ -e "$item" ]] && rm -f "$item"
-    done
+    _purge_dirs "${safe_dirs[@]}"
+    _purge_files "${safe_files[@]}"
     _ok "Phase 1 complete."
 }
 

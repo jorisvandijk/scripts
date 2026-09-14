@@ -2,6 +2,7 @@
 #	jHeic2Png 2.5
 #	Convert HEIC images to PNG
 #	Dependencies: sips (macOS), heif-convert (Linux)
+#	Keywords: image, photo, convert, heic, png, iphone, camera
 #	Usage: jHeic2Png <file> [file2 ...]
 #
 #	By Joris van Dijk | Jorisvandijk.com

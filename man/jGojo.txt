@@ -25,3 +25,7 @@ EXAMPLES
 
     jGojo
         Build, upload, and restart the gojo service on the server.
+
+KEYWORDS
+
+    deploy, build, server, linux, cross-compile

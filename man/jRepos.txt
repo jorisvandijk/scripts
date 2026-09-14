@@ -20,3 +20,7 @@ EXAMPLES
 
     jRepos
         Print the status table for all repos in ~/git.
+
+KEYWORDS
+
+    git status, repositories, overview, dirty, branches

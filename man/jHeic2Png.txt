@@ -24,3 +24,7 @@ EXAMPLES
 
     jHeic2Png *.heic
         Batch-convert everything in the current directory.
+
+KEYWORDS
+
+    image, photo, convert, heic, png, iphone, camera

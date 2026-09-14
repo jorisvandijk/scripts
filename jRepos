@@ -2,6 +2,7 @@
 #	jRepos 2.8
 #	Show git status of all repositories in ~/git
 #	Dependencies: git
+#	Keywords: git status, repositories, overview, dirty, branches
 #	Usage: jRepos
 #
 #	By Joris van Dijk | Jorisvandijk.com

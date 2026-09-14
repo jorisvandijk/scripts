@@ -26,3 +26,7 @@ EXAMPLES
 
     jExtract backup.tar.bz2
         Extract a bzip2 tarball.
+
+KEYWORDS
+
+    unzip, uncompress, untar, archive, zip, tar, rar

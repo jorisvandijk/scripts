@@ -2,6 +2,7 @@
 #	jList 2.2
 #	Directory listing with eza
 #	Dependencies: eza
+#	Keywords: ls, dir, directory, files, eza, browse
 #	Usage: jList [eza args]
 #
 #	By Joris van Dijk | Jorisvandijk.com

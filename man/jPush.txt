@@ -19,3 +19,7 @@ EXAMPLES
 
     jPush
         Stage, commit, and push in one go.
+
+KEYWORDS
+
+    commit, push, git, upload, stage, sync

@@ -2,6 +2,7 @@
 #	jNewRepo 2.4
 #	Initialize a local git repo and create it on GitHub, GitLab, Codeberg, and Bitbucket
 #	Dependencies: git, curl
+#	Keywords: github, gitlab, codeberg, bitbucket, create, initialize, new repo
 #	Usage: jNewRepo [--private] [--desc "description"] REPO_NAME REPO_PATH
 #
 #	By Joris van Dijk | Jorisvandijk.com

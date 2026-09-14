@@ -28,3 +28,7 @@ EXAMPLES
 
     jNewRepo --private --desc "Secret stuff" secret-project ~/code/secret
         The same, but private and with a description.
+
+KEYWORDS
+
+    github, gitlab, codeberg, bitbucket, create, initialize, new repo

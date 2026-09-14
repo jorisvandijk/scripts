@@ -2,6 +2,7 @@
 #	jOpenFzf 2.1
 #	Select files with fzf and open them in micro
 #	Dependencies: fzf, bat, micro
+#	Keywords: open, browse, pick, file picker, edit, micro
 #	Usage: jOpenFzf
 #
 #	By Joris van Dijk | Jorisvandijk.com

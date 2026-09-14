@@ -42,3 +42,7 @@ EXAMPLES
 
     jTidy
         Run the audit, then optionally walk through the cleanup phases.
+
+KEYWORDS
+
+    cleanup, organize, home directory, dotfiles, audit, declutter

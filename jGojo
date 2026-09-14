@@ -2,6 +2,7 @@
 #	jGojo 1.0
 #	Build gojo for Linux and deploy it to the gojo server
 #	Dependencies: go, rsync, ssh
+#	Keywords: deploy, build, server, linux, cross-compile
 #	Usage: jGojo
 #
 #	By Joris van Dijk | Jorisvandijk.com

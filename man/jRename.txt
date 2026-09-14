@@ -27,3 +27,7 @@ EXAMPLES
 
     jRename
         Rename all files in the current directory interactively.
+
+KEYWORDS
+
+    rename, lowercase, label, new name, hyphen, underscore

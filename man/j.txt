@@ -2,13 +2,15 @@ NAME
     j - j-scripts shared library and CLI tooling
 
 SYNOPSIS
-    j <command> [args]
+    j [command] [args]
 
     Commands:
+      (none)            Open the interactive script picker (requires fzf)
       list              List all available j-scripts with descriptions
       new <jName>       Create a new script from the standard template
       man <jName>       Open the man page for a script in $PAGER
       newman <jName>    Create a new man page stub for a script
+      help              Show the command list
 
     Options:
       -h, --help      Show this help
@@ -22,6 +24,18 @@ display, dependency checking (j::require), OS detection (j::os), and the
 editor/discard flow (j::edit_or_discard). Run directly, j acts as a small
 CLI for managing the collection.
 
+Running j with no arguments opens an fzf picker listing all j-scripts with
+their descriptions. Typing any word searches by name, description, and
+keywords. The full man page is shown in the right preview pane. Pressing
+Enter outputs the selected script name with a trailing space. To get the
+selection into your shell prompt buffer, source the included integration
+file from ~/.zshrc:
+
+    source ~/git/scripts/j.zsh
+
+With this in place, typing j and pressing Enter opens the picker;
+selecting a script places its name in the prompt ready for arguments.
+
 "j new" opens $EDITOR with a compliant template and only writes the file
 if it was changed. "j newman" works the same way for man page stubs.
 "j list" reads the description line from each script header at runtime,
@@ -29,8 +43,14 @@ so there is no separate registry to keep in sync.
 
 EXAMPLES
 
+    j
+        Open the interactive script picker.
+
     j list
         Print all j-scripts with their one-line descriptions.
+
+    j help
+        Print the command list.
 
     j new jMyTool
         Open a template for a new script called jMyTool.

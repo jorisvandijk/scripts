@@ -2,6 +2,7 @@
 #	jRename 1.0
 #	Rename files in current directory: lowercase, spaces to hyphens, underscores interactively
 #	Dependencies: none
+#	Keywords: rename, lowercase, label, new name, hyphen, underscore
 #	Usage: jRename
 #
 #	By Joris van Dijk | Jorisvandijk.com

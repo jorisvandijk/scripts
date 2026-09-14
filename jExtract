@@ -2,6 +2,7 @@
 #	jExtract 2.3
 #	Smart archive extraction
 #	Dependencies: tar, unzip, bunzip2, gunzip, unxz, 7zz
+#	Keywords: unzip, uncompress, untar, archive, zip, tar, rar
 #	Usage: jExtract <file>
 #
 #	By Joris van Dijk | Jorisvandijk.com

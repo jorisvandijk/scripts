@@ -20,3 +20,7 @@ EXAMPLES
 
     jLxc
         List all containers and select one to toggle.
+
+KEYWORDS
+
+    lxc, container, proxmox, vm, toggle, start, stop

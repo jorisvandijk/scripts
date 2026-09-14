@@ -28,3 +28,7 @@ EXAMPLES
 
     jBlog
         Start a new post or resume the in-progress draft.
+
+KEYWORDS
+
+    write, post, article, hugo, publish, draft, blog

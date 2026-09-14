@@ -14,8 +14,19 @@ Scripts live at `~/git/scripts/` and are added to PATH directly:
 export PATH="$HOME/git/scripts:$PATH"
 ```
 
-> If `j` doesn't respond, run `type -a j` - a shell function (e.g. from
-> autojump) may be shadowing the binary.
+To make `j` (no args) open the interactive picker and insert the selection
+into your prompt buffer, source the included zsh integration file:
+
+```zsh
+source ~/git/scripts/j.zsh
+```
+
+Selecting a script in the picker then places its name (e.g. `jRename `) in
+the prompt, ready to run with or without arguments.
+
+> If `j` doesn't respond, run `type -a j` — a shell function may be
+> shadowing the binary. `command j` bypasses shell functions and calls
+> the binary directly.
 
 ---
 
@@ -30,10 +41,12 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 ### CLI commands
 
 ```
+j                    Open the interactive script picker (requires fzf)
 j list               List all scripts with their one-line descriptions
 j new <jName>        Create a new script (must cd to ~/git/scripts/ first)
 j man <jName>        Show the man page for a script
 j newman <jName>     Create a new man page stub for a script
+j help               Show the command list
 ```
 
 ---
@@ -63,13 +76,14 @@ Everything needed to write a compliant j-script, in one place.
 
 ### Header
 
-Every script opens with this exact block. Lines 2–8 are tab-indented (`#\t`):
+Every script opens with this exact block. Lines 2–9 are tab-indented (`#\t`):
 
 ```bash
 #!/usr/bin/env bash
 #	jName 1.0
 #	One-line description
 #	Dependencies: dep1, dep2
+#	Keywords: word1, word2, word3
 #	Usage: jName [args]
 #
 #	By Joris van Dijk | Jorisvandijk.com
@@ -148,10 +162,15 @@ EXAMPLES
 
     jName foo
         What this does.
+
+KEYWORDS
+
+    word1, word2, word3
 ```
 
 - `--help` (`j::help`) prints the SYNOPSIS section only.
 - `j man jName` shows the full file.
+- `KEYWORDS` are used by the `j` interactive picker for fuzzy search — include alternative names and task descriptions a user might type.
 
 ### Versioning
 

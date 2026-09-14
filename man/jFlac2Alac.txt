@@ -23,3 +23,7 @@ EXAMPLES
 
     jFlac2Alac .
         Convert everything in the current tree.
+
+KEYWORDS
+
+    audio, music, convert, flac, alac, lossless, apple music

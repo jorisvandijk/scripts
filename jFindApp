@@ -2,6 +2,7 @@
 #	jFindApp 1.2
 #	Search for an app across App Store, Homebrew, and Nix
 #	Dependencies: mas, brew, nix
+#	Keywords: install, search, find, application, app store, homebrew, software
 #	Usage: jFindApp <name>
 #
 #	By Joris van Dijk | Jorisvandijk.com

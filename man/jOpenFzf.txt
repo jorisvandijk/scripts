@@ -18,3 +18,7 @@ EXAMPLES
 
     jOpenFzf
         Browse, pick files, open them in micro.
+
+KEYWORDS
+
+    open, browse, pick, file picker, edit, micro

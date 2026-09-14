@@ -2,6 +2,7 @@
 #	jNix 1.1
 #	Navigate and edit nix configuration files
 #	Dependencies: fzf, bat, micro
+#	Keywords: nix, configuration, nixos, packages, edit config
 #	Usage: jNix [type]
 #
 #	By Joris van Dijk | Jorisvandijk.com

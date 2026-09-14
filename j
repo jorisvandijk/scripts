@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	j 1.4
+#	j 1.5
 #	j-scripts shared library and CLI tooling
 #	Dependencies: none
 #	Usage: j <command> [args]
@@ -90,6 +90,40 @@ _j_list() {
     done
 }
 
+_j_entries() {
+    local script_dir="$1"
+    local script name desc keywords
+    for script in "${script_dir}"/*; do
+        [[ -f "$script" && -x "$script" ]] || continue
+        name="${script##*/}"
+        [[ "$name" == "j" || ! "$name" =~ ^j[A-Z][a-zA-Z0-9]*$ ]] && continue
+        desc="$(sed -n '3s/^#\t//p' "$script")"
+        keywords="$(grep -m1 $'^#\tKeywords: ' "$script" | sed 's/^#\tKeywords: //')"
+        printf '%s\t%s\t%s\n' "$name" "${desc:-(no description)}" "${keywords}"
+    done
+}
+
+_j_launch() {
+    local script_dir; script_dir="$(_j_script_dir)"
+    j::require fzf
+
+    local selection
+    selection=$(
+        _j_entries "$script_dir" | fzf \
+            --delimiter=$'\t' \
+            --with-nth=1,2 \
+            --tabstop=14 \
+            --no-multi \
+            --prompt='j> ' \
+            --height=80% \
+            --reverse \
+            --preview="cat ${script_dir}/man/{1}.txt 2>/dev/null || printf 'No man page available.'" \
+            --preview-window=right:50%:wrap
+    )
+    [[ -z "$selection" ]] && return 0
+    printf '%s ' "${selection%%$'\t'*}"
+}
+
 _j_new() {
     local name="$1"
     local script_dir; script_dir="$(_j_script_dir)"
@@ -106,6 +140,7 @@ _j_new() {
 #	SCRIPTNAME 1.0
 #	One-line description
 #	Dependencies: none
+#	Keywords:
 #	Usage: SCRIPTNAME [args]
 #
 #	By Joris van Dijk | Jorisvandijk.com
@@ -141,7 +176,7 @@ _j_newman() {
     [[ -f "$man_file" ]]                      && j::die "Man page already exists: ${man_file}"
 
     local tmpfile; tmpfile="$(mktemp)"
-    printf 'NAME\n    %s - \n\nSYNOPSIS\n    %s [options]\n\n    Options:\n      -h, --help      Show this help\n      -v, --version   Show version\n\nDESCRIPTION\n\nDescription here.\n\nEXAMPLES\n\n    %s\n        What this does.\n' \
+    printf 'NAME\n    %s - \n\nSYNOPSIS\n    %s [options]\n\n    Options:\n      -h, --help      Show this help\n      -v, --version   Show version\n\nDESCRIPTION\n\nDescription here.\n\nEXAMPLES\n\n    %s\n        What this does.\n\nKEYWORDS\n\n    keyword1, keyword2\n' \
         "$name" "$name" "$name" > "$tmpfile"
 
     j::edit_or_discard "$tmpfile" || { j::info "No changes - man page not created"; return 0; }
@@ -156,10 +191,12 @@ _j_usage() {
 j - j-scripts shared library and CLI tooling
 
 Usage:
+  j                    Launch the interactive script picker
   j list               List all j-scripts with descriptions
   j new <jName>        Create a new script (must run from scripts directory)
   j man <jName>        Show the man page for a script
   j newman <jName>     Create a new man page stub
+  j help               Show this help text
 
   j --version | -v     Show version info
 EOF
@@ -170,8 +207,9 @@ case "${1:-}" in
     new)          _j_new "${2:-}" ;;
     man)          _j_man "${2:-}" ;;
     newman)       _j_newman "${2:-}" ;;
+    help)         _j_usage ;;
     --version|-v) j::version "$0" ;;
     --help|-h)    j::help "j" ;;
-    '')           _j_usage ;;
-    *)            j::die "Unknown command: $1 - run 'j' for usage" ;;
+    '')           _j_launch ;;
+    *)            j::die "Unknown command: $1 - run 'j help' for usage" ;;
 esac

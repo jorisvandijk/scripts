@@ -32,3 +32,7 @@ EXAMPLES
 
     jHugoHelper status
         Create a microblog entry for the current time and open it.
+
+KEYWORDS
+
+    hugo, website, server, static site, post, preview

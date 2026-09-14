@@ -2,6 +2,7 @@
 #	jLxc 1.0
 #	Toggle Proxmox LXC containers on/off
 #	Dependencies: fzf, ssh
+#	Keywords: lxc, container, proxmox, vm, toggle, start, stop
 #	Usage: jLxc
 #
 #	By Joris van Dijk | Jorisvandijk.com
@@ -19,20 +20,20 @@ _fetch_containers() {
 	ssh "$PROXMOX_HOST" "pct list" 2>/dev/null
 }
 
+_format_container_row() {
+	local name="$1" vmid="$2" status="$3"
+	case "$status" in
+		running) printf "${J_GREEN}● running${J_RESET}\t%-30s\t%s\trunning\n" "$name" "$vmid" ;;
+		*)       printf "${J_DIM}○ stopped${J_RESET}\t%-30s\t%s\t${status}\n" "$name" "$vmid" ;;
+	esac
+}
+
 _build_fzf_input() {
 	local raw="$1"
 	local vmid status name
-
 	while IFS= read -r line; do
 		read -r vmid status name _ <<< "$line"
-		case "$status" in
-			running)
-				printf "${J_GREEN}● running${J_RESET}\t%-30s\t%s\trunning\n" "$name" "$vmid"
-				;;
-			*)
-				printf "${J_DIM}○ stopped${J_RESET}\t%-30s\t%s\t${status}\n" "$name" "$vmid"
-				;;
-		esac
+		_format_container_row "$name" "$vmid" "$status"
 	done < <(tail -n +2 <<< "$raw")
 }
 

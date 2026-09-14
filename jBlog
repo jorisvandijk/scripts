@@ -2,6 +2,7 @@
 #	jBlog 1.0
 #	Write and publish a Hugo blog post
 #	Dependencies: hugo, zeditor, fzf, git
+#	Keywords: write, post, article, hugo, publish, draft, blog
 #	Usage: jBlog
 #
 #	By Joris van Dijk | Jorisvandijk.com
@@ -44,22 +45,28 @@ _cleanup() {
     rm -f "$WEBSITE_DIR/.hugo_build.lock" 2>/dev/null
 }
 
-_start_server() {
-    local slug; slug="$(basename "$DRAFT_FILE" .md)"
-    local url="http://localhost:1313/posts/${slug}/"
+_ensure_server() {
+    lsof -i :1313 -sTCP:LISTEN &>/dev/null && return 0
+    hugo server -D &>/dev/null &
+    HUGO_PID=$!
+    j::info "Starting Hugo server..."
+}
 
-    if ! lsof -i :1313 -sTCP:LISTEN &>/dev/null; then
-        hugo server -D &>/dev/null &
-        HUGO_PID=$!
-        j::info "Starting Hugo server..."
-    fi
-
+_wait_for_server() {
+    local url="$1"
     local attempts=0
     until curl -sf "$url" &>/dev/null; do
         sleep 0.3
         attempts=$((attempts + 1))
         [[ $attempts -gt 60 ]] && j::die "Hugo server failed to start"
     done
+}
+
+_start_server() {
+    local slug; slug="$(basename "$DRAFT_FILE" .md)"
+    local url="http://localhost:1313/posts/${slug}/"
+    _ensure_server
+    _wait_for_server "$url"
     open "$url"
 }
 
@@ -93,28 +100,34 @@ _finish_post() {
     j::info "Post saved: $DEST"
 }
 
-_select_tags() {
-    local existing
-    existing="$(grep -h "^tags:" "$WEBSITE_DIR/content/posts/"*.md 2>/dev/null \
+_existing_tags() {
+    grep -h "^tags:" "$WEBSITE_DIR/content/posts/"*.md 2>/dev/null \
         | sed 's/tags: \[//; s/\]//; s/"//g; s/ //g' \
-        | tr ',' '\n' | sort -u | grep -v '^$')"
+        | tr ',' '\n' | sort -u | grep -v '^$'
+}
 
-    local chosen=""
-    [[ -n "$existing" ]] && chosen="$(echo "$existing" \
-        | fzf --multi --prompt="Select tags (Tab toggles, Enter confirms, Esc skips): " \
-              --height=~40% --layout=reverse 2>/dev/null)" || chosen=""
+_pick_tags() {
+    local existing="$1"
+    [[ -z "$existing" ]] && return 0
+    echo "$existing" | fzf --multi \
+        --prompt="Select tags (Tab toggles, Enter confirms, Esc skips): " \
+        --height=~40% --layout=reverse 2>/dev/null
+}
 
-    local new_input=""
+_select_tags() {
+    local chosen; chosen="$(_pick_tags "$(_existing_tags)")"
+    local new_input
     read -r -p "New tags (space-separated, Enter to skip): " new_input
 
-    local all_tags=()
-    local tag
+    local all_tags=() tag
     while IFS= read -r tag; do
         [[ -n "$tag" ]] && all_tags+=("$tag")
     done <<< "$chosen"
     for tag in $new_input; do
         [[ -n "$tag" ]] && all_tags+=("$tag")
     done
+
+    [[ ${#all_tags[@]} -eq 0 ]] && return 0
 
     local tags_str=""
     for tag in "${all_tags[@]}"; do
@@ -123,7 +136,7 @@ _select_tags() {
     tags_str="${tags_str%, }"
 
     sed -i '' "s|^tags:.*|tags: [${tags_str}]|" "$DEST"
-    [[ ${#all_tags[@]} -gt 0 ]] && j::info "Tags: ${tags_str}"
+    j::info "Tags: ${tags_str}"
 }
 
 _push() {

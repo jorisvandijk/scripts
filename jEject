@@ -2,6 +2,7 @@
 #	jEject 1.8
 #	Eject a mounted drive via fzf
 #	Dependencies: fzf, diskutil (macOS), lsblk, udisksctl or eject (Linux)
+#	Keywords: unmount, usb, drive, disk, volume, safely remove
 #	Usage: jEject
 #
 #	By Joris van Dijk | Jorisvandijk.com

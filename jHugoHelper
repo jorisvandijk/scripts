@@ -2,6 +2,7 @@
 #	jHugoHelper 2.6
 #	Hugo site helper: server, new post, new status
 #	Dependencies: hugo
+#	Keywords: hugo, website, server, static site, post, preview
 #	Usage: jHugoHelper {server|new|status} [post-name]
 #
 #	By Joris van Dijk | Jorisvandijk.com

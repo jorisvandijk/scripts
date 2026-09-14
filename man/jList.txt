@@ -30,3 +30,7 @@ EXAMPLES
 
     jList ~/Downloads
         List a specific directory.
+
+KEYWORDS
+
+    ls, dir, directory, files, eza, browse

@@ -26,3 +26,7 @@ EXAMPLES
 
     jFindApp iterm
         Search all three stores for "iterm".
+
+KEYWORDS
+
+    install, search, find, application, app store, homebrew, software

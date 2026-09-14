@@ -21,3 +21,7 @@ EXAMPLES
 
     jEject
         Open the drive picker and eject the selected drive.
+
+KEYWORDS
+
+    unmount, usb, drive, disk, volume, safely remove
