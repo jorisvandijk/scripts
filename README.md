@@ -197,6 +197,7 @@ Add every new script to the `## Scripts` table below.
 | `jNix` | Navigate and edit nix configuration files |
 | `jOpenFzf` | Select files with fzf and open them in micro |
 | `jPush` | Stage, commit, and push to Git |
+| `jRename` | Rename files in current directory: lowercase, spaces to hyphens, underscores interactively |
 | `jRepos` | Show git status of all repositories in ~/git |
 | `jTidy` | Audit the macOS home directory and guide an interactive cleanup |
 

@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+#	jRename 1.0
+#	Rename files in current directory: lowercase, spaces to hyphens, underscores interactively
+#	Dependencies: none
+#	Usage: jRename
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jRename" && exit 0
+[[ -n "$1" ]]                             && j::die "Usage: jRename (no arguments)"
+
+RESOLVED_NAME=""
+
+_ask_underscore() {
+    local before="$1"
+    local after="$2"
+    local answer
+    printf "  %s${J_RED}${J_BOLD}_${J_RESET}%s  [a] hyphen  [b] underscore: " "$before" "$after" >/dev/tty
+    while true; do
+        read -r -n1 answer </dev/tty
+        case "$answer" in
+            a|A) printf "\n" >/dev/tty; RESOLVED_NAME="${RESOLVED_NAME}-"; return ;;
+            b|B) printf "\n" >/dev/tty; RESOLVED_NAME="${RESOLVED_NAME}_"; return ;;
+        esac
+    done
+}
+
+_resolve_underscores() {
+    local name="$1"
+    local idx=0
+    local char
+    RESOLVED_NAME=""
+    while [[ $idx -lt ${#name} ]]; do
+        char="${name:$idx:1}"
+        if [[ "$char" == "_" ]]; then
+            _ask_underscore "$RESOLVED_NAME" "${name:$((idx+1))}"
+        else
+            RESOLVED_NAME="${RESOLVED_NAME}${char}"
+        fi
+        (( idx++ ))
+    done
+}
+
+_process_files() {
+    local file lowercased candidate
+    local changed=0
+    for file in *; do
+        [[ -f "$file" || -d "$file" ]] || continue
+        lowercased="${file,,}"
+        candidate="${lowercased// /-}"
+
+        if [[ "$candidate" == *_* ]]; then
+            printf "\n${J_BOLD}%s${J_RESET}\n" "$file"
+            _resolve_underscores "$candidate"
+            candidate="$RESOLVED_NAME"
+        fi
+
+        [[ "$candidate" == "$file" ]] && continue
+        [[ -e "$candidate" ]] && ! [[ "$file" -ef "$candidate" ]] && { j::warn "Skipping '$file': '$candidate' already exists"; continue; }
+        mv -- "$file" "$candidate"
+        j::info "Renamed: '$file' → '$candidate'"
+        changed=$(( changed + 1 ))
+    done
+    if [[ $changed -eq 0 ]]; then
+        j::info "No files needed renaming"
+    fi
+}
+
+_process_files
