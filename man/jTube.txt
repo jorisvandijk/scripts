@@ -1,0 +1,41 @@
+NAME
+    jTube - Resolve YouTube channel IDs and output Nix RSS feed entries
+
+SYNOPSIS
+    jTube <url-or-handle> [url-or-handle ...]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+Fetches a YouTube channel or video page and extracts the channel ID,
+then prints a Nix-formatted RSS feed entry for each input.
+
+Accepted input formats:
+  @handle                           YouTube channel handle (e.g. @veritasium)
+  https://www.youtube.com/@handle   Full channel URL
+  https://www.youtube.com/channel/UCxxxxx
+  https://www.youtube.com/watch?v=VIDEO_ID
+
+Output format:
+  { url = "https://www.youtube.com/feeds/videos.xml?channel_id=UCxxxxx"; title = "Name"; }
+
+Multiple inputs are processed in sequence; a failed lookup skips that
+entry and continues with the rest. No API key is required.
+
+EXAMPLES
+
+    jTube @veritasium
+        Outputs the Nix RSS entry for the Veritasium channel.
+
+    jTube https://www.youtube.com/watch?v=dQw4w9WgXcQ
+        Resolves the channel from a video URL and outputs its RSS entry.
+
+    jTube @veritasium @linuxfoundation @3blue1brown
+        Processes three channels and prints one Nix line each.
+
+KEYWORDS
+
+    youtube, channel, id, rss, nix, feed, subscribe, newsboat

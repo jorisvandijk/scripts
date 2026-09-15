@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+#	jTube 1.0
+#	Resolve YouTube channel IDs and output Nix RSS feed entries
+#	Dependencies: curl
+#	Keywords: youtube, channel, id, rss, nix, feed, subscribe
+#	Usage: jTube <url-or-handle> [url-or-handle ...]
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jTube" && exit 0
+[[ -z "$1" ]]                             && j::die "Usage: jTube <url-or-handle> [...]"
+
+j::require curl
+
+_normalize_url() {
+    local input="$1"
+    [[ "$input" == @*    ]] && printf 'https://www.youtube.com/%s' "$input" && return 0
+    [[ "$input" == http* ]] && printf '%s' "$input" && return 0
+    j::error "Invalid input '${input}': must be a @handle or a YouTube URL"
+    return 1
+}
+
+_fetch_page() {
+    local url="$1"
+    local tmpfile
+    tmpfile="$(mktemp)"
+    curl -sL --user-agent "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
+        "$url" -o "$tmpfile" || { rm -f "$tmpfile"; return 1; }
+    printf '%s' "$tmpfile"
+}
+
+_extract_channel_id() {
+    local file="$1"
+    local channel_id
+    channel_id=$(grep -o 'feeds/videos.xml?channel_id=[^"&]*' "$file" | head -1 | grep -o 'UC[^&"]*')
+    [[ -z "$channel_id" ]] && \
+        channel_id=$(grep -o '"channelId":"[^"]*"' "$file" | head -1 | grep -o 'UC[^"]*')
+    printf '%s' "$channel_id"
+}
+
+_extract_channel_title() {
+    local file="$1"
+    local title
+    title=$(grep -o '"channelMetadataRenderer":{"title":"[^"]*"' "$file" | head -1 \
+        | sed 's/.*"title":"//; s/".*//')
+    [[ -z "$title" ]] && \
+        title=$(grep -o '"ownerChannelName":"[^"]*"' "$file" | head -1 \
+            | sed 's/.*"ownerChannelName":"//; s/".*//')
+    printf '%s' "$title"
+}
+
+_format_nix_line() {
+    local channel_id="$1"
+    local title="$2"
+    printf '{ url = "https://www.youtube.com/feeds/videos.xml?channel_id=%s"; title = "%s"; }\n' \
+        "$channel_id" "$title"
+}
+
+_process_channel() {
+    local input="$1"
+    local url channel_id title tmpfile
+    url=$(_normalize_url "$input") || return 1
+    tmpfile=$(_fetch_page "$url") || { j::error "Failed to fetch: ${input}"; return 1; }
+    channel_id=$(_extract_channel_id "$tmpfile")
+    [[ -z "$channel_id" ]] && { j::error "Could not find channel ID for: ${input}"; rm -f "$tmpfile"; return 1; }
+    title=$(_extract_channel_title "$tmpfile")
+    [[ -z "$title" ]] && j::warn "Could not find title for: ${input}"
+    rm -f "$tmpfile"
+    _format_nix_line "$channel_id" "$title"
+}
+
+for ARG in "$@"; do
+    _process_channel "$ARG"
+done

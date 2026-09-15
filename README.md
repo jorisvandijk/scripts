@@ -219,6 +219,7 @@ Add every new script to the `## Scripts` table below.
 | `jRename` | Rename files in current directory: lowercase, spaces to hyphens, underscores interactively |
 | `jRepos` | Show git status of all repositories in ~/git |
 | `jTidy` | Audit the macOS home directory and guide an interactive cleanup |
+| `jTube` | Resolve YouTube channel IDs and output Nix RSS feed entries |
 
 Run `j list` for live descriptions parsed from each script's header.
 
