@@ -14,12 +14,16 @@ DESCRIPTION
 
 Creates the repository on GitHub, GitLab, Codeberg, and Bitbucket, then
 initializes a local repo in REPO_PATH with all four forges configured
-as push remotes.
+as push remotes. The fetch remote (origin) points to Bitbucket only;
+GitHub, GitLab, and Codeberg are push-only. A plain "git fetch" will
+only reach Bitbucket.
 
 Before creating anything, the script validates all four API tokens and
 verifies that no repository with that name exists on any of the forges.
 If any check fails, it stops without creating a single thing.
-Credentials are read from ~/git/documents/newrepo/config.
+Credentials are read from ~/git/documents/newrepo/config, which must
+define: GITHUB_TOKEN, GITLAB_TOKEN, CODEBERG_TOKEN, BITBUCKET_WORKSPACE,
+BITBUCKET_EMAIL, and BITBUCKET_API_TOKEN.
 
 EXAMPLES
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jRepos 2.8
+#	jRepos 3.0
 #	Show git status of all repositories in ~/git
 #	Dependencies: git
 #	Keywords: git status, repositories, overview, dirty, branches
@@ -62,32 +62,39 @@ _print_group() {
 
 [[ ! -d "$GIT_BASE_DIR" ]] && j::die "Git directory not found: $GIT_BASE_DIR"
 
+_process_repo() {
+    local repo_dir="$1"
+    local repo_name conflicted staged modified untracked behind ahead label
+    repo_name="${repo_dir%/}"; repo_name="${repo_name##*/}"
+
+    IFS='|' read -r conflicted staged modified untracked \
+        <<< "$(git -C "$repo_dir" status --porcelain 2>/dev/null | _count_states)"
+    behind=0; ahead=0
+    read -r behind ahead \
+        < <(git -C "$repo_dir" rev-list --count --left-right @{upstream}...HEAD 2>/dev/null) || true
+    behind="${behind:-0}"; ahead="${ahead:-0}"
+
+    label=$(_build_label "$conflicted" "$staged" "$modified" "$untracked" "$ahead" "$behind")
+
+    case "$(_classify "$conflicted" "$staged" "$modified" "$untracked" "$ahead" "$behind")" in
+        conflict) CONFLICT_ENTRIES+=("$repo_name|$label") ;;
+        sync)     SYNC_ENTRIES+=("$repo_name|$label")     ;;
+        dirty)    DIRTY_ENTRIES+=("$repo_name|$label")    ;;
+        clean)    CLEAN_ENTRIES+=("$repo_name|$label")    ;;
+    esac
+}
+
 CONFLICT_ENTRIES=() SYNC_ENTRIES=() DIRTY_ENTRIES=() CLEAN_ENTRIES=()
 
 for REPO_DIR in "$GIT_BASE_DIR"/*/; do
     [[ -d "$REPO_DIR/.git" ]] || continue
-    REPO_NAME="${REPO_DIR%/}"
-    REPO_NAME="${REPO_NAME##*/}"
-
-    IFS='|' read -r CONFLICTED STAGED MODIFIED UNTRACKED <<< "$(git -C "$REPO_DIR" status --porcelain 2>/dev/null | _count_states)"
-    BEHIND=0 AHEAD=0
-    read -r BEHIND AHEAD < <(git -C "$REPO_DIR" rev-list --count --left-right @{upstream}...HEAD 2>/dev/null) || true
-    BEHIND="${BEHIND:-0}" AHEAD="${AHEAD:-0}"
-
-    LABEL=$(_build_label "$CONFLICTED" "$STAGED" "$MODIFIED" "$UNTRACKED" "$AHEAD" "$BEHIND")
-
-    case "$(_classify "$CONFLICTED" "$STAGED" "$MODIFIED" "$UNTRACKED" "$AHEAD" "$BEHIND")" in
-        conflict) CONFLICT_ENTRIES+=("$REPO_NAME|$LABEL") ;;
-        sync)     SYNC_ENTRIES+=("$REPO_NAME|$LABEL")     ;;
-        dirty)    DIRTY_ENTRIES+=("$REPO_NAME|$LABEL")    ;;
-        clean)    CLEAN_ENTRIES+=("$REPO_NAME|$LABEL")    ;;
-    esac
+    _process_repo "$REPO_DIR"
 done
 
 TOTAL=$(( ${#CONFLICT_ENTRIES[@]} + ${#SYNC_ENTRIES[@]} + ${#DIRTY_ENTRIES[@]} + ${#CLEAN_ENTRIES[@]} ))
 [[ "$TOTAL" -eq 0 ]] && j::info "No Git repositories found in: $GIT_BASE_DIR" && exit 0
 
 _print_group "$J_RED"    "${CONFLICT_ENTRIES[@]}"
-_print_group "$J_RED"    "${SYNC_ENTRIES[@]}"
+_print_group "$J_CYAN"   "${SYNC_ENTRIES[@]}"
 _print_group "$J_YELLOW" "${DIRTY_ENTRIES[@]}"
 _print_group "$J_GREEN"  "${CLEAN_ENTRIES[@]}"

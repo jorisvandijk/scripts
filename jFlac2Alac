@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jFlac2Alac 2.5
+#	jFlac2Alac 3.0
 #	Batch-convert FLAC files to Apple Lossless (ALAC)
 #	Dependencies: ffmpeg
 #	Keywords: audio, music, convert, flac, alac, lossless, apple music
@@ -33,6 +33,7 @@ _convert_file() {
         _log_failure "$flac_file"
         return 1
     }
+    [[ -s "$m4a_file" ]] || { j::warn "Output file empty: $m4a_file — original kept"; _log_failure "$flac_file"; return 1; }
     rm "$flac_file"
     j::info "Done: $m4a_file"
 }
@@ -40,5 +41,5 @@ _convert_file() {
 FAILED=0
 while IFS= read -r FLAC_FILE; do
     _convert_file "$FLAC_FILE" || FAILED=1
-done < <(find "$1" -type f -name "*.flac")
+done < <(find "$1" -type f -name "*.flac" | sort)
 exit "$FAILED"

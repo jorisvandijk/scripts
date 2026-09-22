@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jEject 1.8
+#	jEject 3.0
 #	Eject a mounted drive via fzf
 #	Dependencies: fzf, diskutil (macOS), lsblk, udisksctl or eject (Linux)
 #	Keywords: unmount, usb, drive, disk, volume, safely remove
@@ -37,7 +37,10 @@ _eject_macos() {
 }
 
 _eject_linux() {
-    command -v udisksctl &>/dev/null && udisksctl power-off -b "$1" && return
+    if udisksctl power-off -b "$1" 2>/dev/null; then
+        return 0
+    fi
+    command -v eject &>/dev/null || j::die "Neither udisksctl nor eject is available"
     eject "$1"
 }
 

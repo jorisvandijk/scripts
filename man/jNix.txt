@@ -32,7 +32,8 @@ narrow the list to that category only.
 Selecting an entry opens it in micro at the exact line. After micro exits,
 jNix asks whether to run sudo darwin-rebuild switch to apply the change.
 
-CTRL-B in the picker opens the file read-only in bat instead of editing.
+The picker shows a bat preview of the selected file with the matching line
+highlighted in the right pane.
 
 EXAMPLES
 

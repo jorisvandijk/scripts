@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jHugoHelper 2.6
+#	jHugoHelper 3.0
 #	Hugo site helper: server, new post, new status
 #	Dependencies: hugo
 #	Keywords: hugo, website, server, static site, post, preview
@@ -21,28 +21,31 @@ WEBSITE_DIR="$HOME/git/website"
 
 _enter_website_dir() { cd "$WEBSITE_DIR" || j::die "Could not cd to $WEBSITE_DIR"; }
 
+_new_post() {
+    local post_name="$1"
+    [[ -z "$post_name" ]] && j::die "Post name required - Usage: jHugoHelper new <post-name>"
+    _enter_website_dir
+    hugo new "posts/${post_name}.md" || j::die "Hugo could not create the post"
+    local filepath="content/posts/${post_name}.md"
+    j::edit_or_discard "$filepath" || { j::info "No changes - post discarded"; exit 0; }
+}
+
+_new_status() {
+    _enter_website_dir
+    local timestamp; timestamp="$(date +%Y-%m-%d-%H%M%S)"
+    local filepath="content/microblog/${timestamp}.md"
+    [[ -e "$filepath" ]] && j::die "Path already exists: ${filepath}"
+    hugo new "microblog/${timestamp}.md" || j::die "Hugo could not create the status"
+    j::edit_or_discard "$filepath" || { j::info "No changes - status discarded"; exit 0; }
+}
+
 case "$1" in
     server)
         _enter_website_dir
+        trap 'rm -f "$WEBSITE_DIR/.hugo_build.lock"' EXIT
         hugo server -D
-        rm "$WEBSITE_DIR/.hugo_build.lock" 2>/dev/null
         ;;
-    new)
-        [[ -z "$2" ]] && j::die "Post name required - Usage: jHugoHelper new <post-name>"
-        _enter_website_dir
-        hugo new "posts/${2}.md" || j::die "Hugo could not create the post"
-        FILEPATH="content/posts/${2}.md"
-        j::edit_or_discard "$FILEPATH" || j::die "No changes - post discarded"
-        ;;
-    status)
-        _enter_website_dir
-        TIMESTAMP="$(date +%Y-%m-%d-%H%M%S)"
-        FILEPATH="content/microblog/${TIMESTAMP}.md"
-        [[ -e "$FILEPATH" ]] && j::die "Path already exists: ${FILEPATH}"
-        hugo new "microblog/${TIMESTAMP}.md" || j::die "Hugo could not create the status"
-        j::edit_or_discard "$FILEPATH" || j::die "No changes - status discarded"
-        ;;
-    *)
-        j::die "Usage: jHugoHelper {server|new|status} [post-name]"
-        ;;
+    new)    _new_post "${2:-}" ;;
+    status) _new_status ;;
+    *)      j::die "Usage: jHugoHelper {server|new|status} [post-name]" ;;
 esac

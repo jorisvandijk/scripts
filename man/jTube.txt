@@ -2,7 +2,7 @@ NAME
     jTube - Resolve YouTube channel IDs and output Nix RSS feed entries
 
 SYNOPSIS
-    jTube <url-or-handle> [url-or-handle ...]
+    jTube [options] <url-or-handle> [url-or-handle ...]
 
     Options:
       -h, --help      Show this help

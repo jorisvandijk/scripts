@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jPush 2.8
+#	jPush 3.0
 #	Stage, commit, and push to Git
 #	Dependencies: git
 #	Keywords: commit, push, git, upload, stage, sync
@@ -28,7 +28,7 @@ _push_with_upstream() {
     current_branch="$(git rev-parse --abbrev-ref HEAD)"
     [[ -z "$current_branch" ]] && { j::error "Unable to determine current branch"; _cleanup; }
     j::warn "Push failed - no upstream branch set for '$current_branch'"
-    git push --set-upstream origin "$current_branch" || { j::error "Failed to push after setting upstream"; _cleanup; }
+    git push --set-upstream origin "$current_branch" || j::die "Push failed — commit exists locally on branch '${current_branch}', push manually when ready"
     j::info "Upstream set and changes pushed"
 }
 
@@ -40,8 +40,8 @@ git add . || j::die "Failed to stage changes"
 j::info "Git status:"
 git status
 
-echo
-j::info "Enter commit message (or press Ctrl+C to cancel):"
+j::msg ""
+j::prompt "Enter commit message (or press Ctrl+C to cancel):"
 read -r COMMIT_MSG
 
 [[ -z "$COMMIT_MSG" ]] && j::die "Commit message cannot be empty"

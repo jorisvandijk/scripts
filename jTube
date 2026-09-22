@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jTube 1.0
+#	jTube 3.0
 #	Resolve YouTube channel IDs and output Nix RSS feed entries
 #	Dependencies: curl
 #	Keywords: youtube, channel, id, rss, nix, feed, subscribe
@@ -36,9 +36,9 @@ _fetch_page() {
 _extract_channel_id() {
     local file="$1"
     local channel_id
-    channel_id=$(grep -o 'feeds/videos.xml?channel_id=[^"&]*' "$file" | head -1 | grep -o 'UC[^&"]*')
+    channel_id=$(grep -o 'feeds/videos.xml?channel_id=[^"&]*' "$file" | head -1 | grep -oE 'UC[A-Za-z0-9_-]{22}')
     [[ -z "$channel_id" ]] && \
-        channel_id=$(grep -o '"channelId":"[^"]*"' "$file" | head -1 | grep -o 'UC[^"]*')
+        channel_id=$(grep -o '"channelId":"[^"]*"' "$file" | head -1 | grep -oE 'UC[A-Za-z0-9_-]{22}')
     printf '%s' "$channel_id"
 }
 
@@ -65,11 +65,13 @@ _process_channel() {
     local url channel_id title tmpfile
     url=$(_normalize_url "$input") || return 1
     tmpfile=$(_fetch_page "$url") || { j::error "Failed to fetch: ${input}"; return 1; }
+    trap "rm -f '$tmpfile'" EXIT
     channel_id=$(_extract_channel_id "$tmpfile")
-    [[ -z "$channel_id" ]] && { j::error "Could not find channel ID for: ${input}"; rm -f "$tmpfile"; return 1; }
+    [[ -z "$channel_id" ]] && { j::error "Could not find channel ID for: ${input}"; rm -f "$tmpfile"; trap - EXIT; return 1; }
     title=$(_extract_channel_title "$tmpfile")
     [[ -z "$title" ]] && j::warn "Could not find title for: ${input}"
     rm -f "$tmpfile"
+    trap - EXIT
     _format_nix_line "$channel_id" "$title"
 }
 

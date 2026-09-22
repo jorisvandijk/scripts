@@ -1,5 +1,5 @@
 NAME
-    jRename - rename files in current directory: lowercase, spaces to hyphens, underscores interactively
+    jRename - rename files in current directory: lowercase, spaces and underscores to hyphens
 
 SYNOPSIS
     jRename [options]
@@ -10,23 +10,20 @@ SYNOPSIS
 
 DESCRIPTION
 
-Renames every file in the current directory using three transformations applied
-in order:
+Renames every file and directory in the current directory using three
+transformations applied in order:
 
-  1. Lowercase  — the entire filename is converted to lowercase.
-  2. Spaces     — every space is replaced with a hyphen.
-  3. Underscores — each underscore is presented to you one at a time, left to
-                   right. The underscore is highlighted in the filename so you
-                   can see its position at a glance. Press [a] to replace it
-                   with a hyphen or [b] to keep it as an underscore.
+  1. Lowercase   — the entire filename is converted to lowercase.
+  2. Spaces      — every space is replaced with a hyphen.
+  3. Underscores — every underscore is replaced with a hyphen.
 
-Files whose name is already correct are silently skipped. If the computed new
-name conflicts with an existing file, that file is skipped with a warning.
+Items whose name is already correct are silently skipped. If the computed new
+name conflicts with an existing entry, it is skipped with a warning.
 
 EXAMPLES
 
     jRename
-        Rename all files in the current directory interactively.
+        Rename all files and directories in the current directory.
 
 KEYWORDS
 

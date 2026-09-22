@@ -101,6 +101,11 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 [[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jName" && exit 0
 ```
 
+> **Exception — `j` itself:** The shared library cannot source itself.
+> It handles `--version` and `--help` in its bottom `case` statement and
+> guards the CLI section with `[[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 0`.
+> This is the only permitted deviation from the boilerplate form.
+
 Add a no-argument guard if the script takes no arguments:
 
 ```bash
@@ -112,7 +117,7 @@ Add a no-argument guard if the script takes no arguments:
 | Function | Behavior |
 |---|---|
 | `j::info "msg"` | Green `[INFO]` to stdout |
-| `j::warn "msg"` | Yellow `[WARNING]` to stdout |
+| `j::warn "msg"` | Yellow `[WARNING]` to stderr |
 | `j::error "msg"` | Red `[ERROR]` to stderr |
 | `j::die "msg"` | Red `Error:` to stderr, exit 1 |
 | `j::version "$0"` | Print line 2 of the script header |
@@ -122,6 +127,9 @@ Add a no-argument guard if the script takes no arguments:
 | `j::require prog [prog2 ...]` | Die if any listed program is not in PATH |
 | `j::os` | Print `macos` or `linux`; die on unsupported OS |
 | `j::edit_or_discard file` | Open file in `$EDITOR`; remove it and return 1 if unchanged, return 0 if changed |
+| `j::msg "msg"` | Print message to stdout with no prefix |
+| `j::prompt "text"` | Print bold inline prompt to stdout, no trailing newline |
+| `j::confirm "question" Y\|N` | Prompt for y/n, reprompt on invalid input, return 0 if confirmed. Second argument sets the default and must be `Y` or `N` |
 
 Colors available directly in any script: `$J_RED`, `$J_GREEN`, `$J_YELLOW`, `$J_RESET`, `$J_BOLD`, `$J_DIM`, `$J_CYAN`.
 
@@ -174,8 +182,11 @@ KEYWORDS
 
 ### Versioning
 
-- Start at `1.0`. Bump the minor version for each meaningful change.
-- Version lives on line 2 of the header: `#	jName 1.2`.
+All scripts share the same **major** version as `j`. The minor is per-script and increments by 1 for each meaningful change. Minor is a plain integer — `1.9` goes to `1.10`, not `2.0`.
+
+- **Major bump:** declared when a significant round of changes advances the whole suite (e.g. a code review touching many scripts, a breaking change to the `j` library). All scripts move to the new `MAJOR.0` together — the minor counter resets to `0` regardless of where it was (`2.18` becomes `3.0`, not `3.18`).
+- **Minor bump:** any meaningful change to a specific script — bug fix, improvement, or new feature. Only the changed script's minor increments.
+- Version lives on line 2 of the header: `#	jName 3.2`.
 
 ### README entry
 
@@ -212,11 +223,12 @@ Add every new script to the `## Scripts` table below.
 | `jHeic2Png` | Convert HEIC images to PNG |
 | `jHugoHelper` | Hugo site helper: server, new post, new status |
 | `jList` | Directory listing with eza |
+| `jLxc` | Toggle Proxmox LXC containers on/off |
 | `jNewRepo` | Initialize a local git repo and create it on GitHub, GitLab, Codeberg, and Bitbucket |
 | `jNix` | Navigate and edit nix configuration files |
 | `jOpenFzf` | Select files with fzf and open them in micro |
 | `jPush` | Stage, commit, and push to Git |
-| `jRename` | Rename files in current directory: lowercase, spaces to hyphens, underscores interactively |
+| `jRename` | Rename files in current directory: lowercase, spaces and underscores to hyphens |
 | `jRepos` | Show git status of all repositories in ~/git |
 | `jTidy` | Audit the macOS home directory and guide an interactive cleanup |
 | `jTube` | Resolve YouTube channel IDs and output Nix RSS feed entries |

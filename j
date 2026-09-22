@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-#	j 1.5
+#	j 3.0
 #	j-scripts shared library and CLI tooling
 #	Dependencies: none
+#	Keywords: library, cli, help, list, new, man
 #	Usage: j <command> [args]
 #
 #	By Joris van Dijk | Jorisvandijk.com
@@ -21,7 +22,7 @@ J_RED='' J_GREEN='' J_YELLOW='' J_RESET='' J_BOLD='' J_DIM='' J_CYAN=''
 _j_cap() { local text="$*"; printf '%s' "${text^}"; }
 
 j::info()  { printf "${J_GREEN}[INFO]${J_RESET} %s\n"     "$(_j_cap "$*")"; }
-j::warn()  { printf "${J_YELLOW}[WARNING]${J_RESET} %s\n" "$(_j_cap "$*")"; }
+j::warn()  { printf "${J_YELLOW}[WARNING]${J_RESET} %s\n" "$(_j_cap "$*")" >&2; }
 j::error() { printf "${J_RED}[ERROR]${J_RESET} %s\n"      "$(_j_cap "$*")" >&2; }
 j::die()   { printf "${J_RED}Error: %s${J_RESET}\n"        "$(_j_cap "$*")" >&2; exit 1; }
 j::row()   { printf "${1}%-20s %s${J_RESET}\n" "$2" "$3"; }
@@ -39,6 +40,22 @@ j::os() {
         Linux)  echo "linux" ;;
         *)      j::die "Unsupported OS: $(uname)" ;;
     esac
+}
+
+j::msg()    { printf "%s\n" "$*"; }
+j::prompt() { printf "${J_BOLD}%s${J_RESET} " "$*"; }
+j::confirm() {
+    local question="$1" default="$2"
+    local hint answer
+    [[ "$default" == "Y" ]] && hint="[Y/n]" || hint="[y/N]"
+    while true; do
+        j::prompt "$question $hint"
+        read -r answer
+        case "${answer:-$default}" in
+            [Yy]*) return 0 ;;
+            [Nn]*) return 1 ;;
+        esac
+    done
 }
 
 j::edit_or_discard() {
@@ -69,7 +86,7 @@ j::help() {
     local script_dir; script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
     local man_file="${script_dir}/man/${name}.txt"
     [[ ! -f "$man_file" ]] && j::die "No help available for ${name}"
-    awk '/^SYNOPSIS$/{found=1; next} found && /^[A-Z][A-Z]/{exit} found{print}' "$man_file"
+    awk '/^SYNOPSIS$/{found=1; next} found && /^[A-Z]+$/{exit} found{print}' "$man_file"
 }
 
 [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 0
@@ -134,6 +151,7 @@ _j_new() {
     [[ -f "${script_dir}/${name}" ]]            && j::die "Script '${name}' already exists"
 
     local tmpfile; tmpfile="$(mktemp)"
+    trap 'rm -f "$tmpfile"' EXIT
 
     sed "s/SCRIPTNAME/${name}/g" << 'TEMPLATE' > "$tmpfile"
 #!/usr/bin/env bash
@@ -176,6 +194,7 @@ _j_newman() {
     [[ -f "$man_file" ]]                      && j::die "Man page already exists: ${man_file}"
 
     local tmpfile; tmpfile="$(mktemp)"
+    trap 'rm -f "$tmpfile"' EXIT
     printf 'NAME\n    %s - \n\nSYNOPSIS\n    %s [options]\n\n    Options:\n      -h, --help      Show this help\n      -v, --version   Show version\n\nDESCRIPTION\n\nDescription here.\n\nEXAMPLES\n\n    %s\n        What this does.\n\nKEYWORDS\n\n    keyword1, keyword2\n' \
         "$name" "$name" "$name" > "$tmpfile"
 

@@ -12,10 +12,10 @@ DESCRIPTION
 
 Searches for <name> in the Mac App Store (via mas), Homebrew (brew search),
 and Nix (nix search nixpkgs), and prints a one-line summary per store.
+Requires mas, brew, and nix to all be installed.
 
-Found packages are listed in green; "not found" is shown in red. If a
-required CLI is not installed, a yellow warning is shown for that store and
-the search continues with the others.
+Each result is color-coded: green for an exact match, yellow for close but
+not exact matches, red when nothing is found.
 
 Note: the first Nix search may be slow while the package index is fetched.
 

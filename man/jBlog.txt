@@ -10,16 +10,24 @@ SYNOPSIS
 
 DESCRIPTION
 
-Full write-to-publish workflow for the Hugo blog at ~/git/website. Drafts
-are stored in content/posts/_drafts/ (excluded from Hugo builds by Hugo's
-underscore convention) and moved to content/posts/ on completion.
+Full write-to-publish workflow for the Hugo blog at ~/git/website. Uses
+Zed (zeditor) as the editor — $EDITOR is not used.
 
-Running jBlog with an existing draft resumes that draft instead of
-creating a new one — the draft stays in _drafts/ until you supply a title
-and finish the post. Closing the Zed window signals that writing is done;
-the script then prompts for the post title, renames and moves the file
-to content/posts/<slug>.md, sets draft: false in the front matter, and
-optionally commits and pushes to git.
+Running jBlog creates a new draft at content/posts/untitled-<timestamp>.md,
+starts a Hugo dev server, and opens the draft URL in the browser. If an
+untitled-*.md file already exists in content/posts/, that draft is resumed
+instead of creating a new one.
+
+Close the Zed window when done writing. The script then:
+
+  1. Prompts for the post title (loops until non-empty).
+  2. Renames the draft to content/posts/<slug>.md, sets draft: false,
+     and updates the timestamp.
+  3. Opens an fzf multi-select picker of existing post tags; select any
+     that apply. Then prompts for additional free-form tags
+     (space-separated; Enter to skip).
+  4. Asks whether to push to git (default: N). If confirmed, stages the
+     post file, commits with "Add post: <title>", and pushes.
 
 Interrupting the script (Ctrl+C) at any point kills the Hugo server and
 leaves the draft intact for the next session.

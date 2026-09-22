@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jFindApp 1.2
+#	jFindApp 3.0
 #	Search for an app across App Store, Homebrew, and Nix
 #	Dependencies: mas, brew, nix
 #	Keywords: install, search, find, application, app store, homebrew, software
@@ -14,19 +14,25 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 [[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jFindApp" && exit 0
 [[ -z "$1" ]] && j::die "Usage: jFindApp <name>"
 
+j::require mas brew nix
+
 QUERY="$1"
 
-_format_result() {
-    local label="$1"
-    local all_names="$2"
+_classify_match() {
+    local all_names="$1"
     local exact close
-
     exact=$(grep -ix "$QUERY" <<< "$all_names")
     close=$(grep -i "$QUERY" <<< "$all_names" \
         | grep -vix "$QUERY" \
         | head -5 \
         | awk 'NR>1{printf ", "}{printf "%s",$0}END{if(NR>0)printf "\n"}')
+    printf '%s\t%s' "$exact" "$close"
+}
 
+_format_result() {
+    local label="$1" all_names="$2"
+    local exact close
+    IFS=$'\t' read -r exact close <<< "$(_classify_match "$all_names")"
     case "${exact:+e}${close:+c}" in
         ec) j::row "$J_GREEN"  "$label" "${exact}  ${close}" ;;
         e)  j::row "$J_GREEN"  "$label" "$exact" ;;
@@ -36,7 +42,6 @@ _format_result() {
 }
 
 _search_appstore() {
-    command -v mas &>/dev/null || { j::row "$J_YELLOW" "App Store" "mas not installed"; return; }
     local all_names
     all_names=$(mas search "$QUERY" 2>/dev/null | awk '{
         sub(/^[[:space:]]*[0-9]+[[:space:]]+/, "")
@@ -47,7 +52,6 @@ _search_appstore() {
 }
 
 _search_homebrew() {
-    command -v brew &>/dev/null || { j::row "$J_YELLOW" "Homebrew" "brew not installed"; return; }
     local all_names
     all_names=$(brew search "$QUERY" 2>/dev/null \
         | grep -v '^==>' \
@@ -57,9 +61,9 @@ _search_homebrew() {
 }
 
 _search_nix() {
-    command -v nix &>/dev/null || { j::row "$J_YELLOW" "Nix" "nix not installed"; return; }
     local arch all_names
-    arch="$(uname -m | sed 's/arm64/aarch64/')-darwin"
+    local uname_m; uname_m="$(uname -m)"
+    arch="${uname_m/arm64/aarch64}-darwin"
     all_names=$(nix search nixpkgs "$QUERY" 2>/dev/null \
         | sed 's/\x1b\[[0-9;]*m//g' \
         | grep "^\* legacyPackages\.${arch}\." \
@@ -69,7 +73,7 @@ _search_nix() {
 }
 
 j::info "Results for: ${QUERY}"
-echo
+j::msg ""
 _search_appstore
 _search_homebrew
 _search_nix

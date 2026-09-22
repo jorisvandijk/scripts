@@ -16,7 +16,7 @@ DESCRIPTION
 Runs eza in long format with binary sizes, headers, colors, git status
 per file, repository summaries, icons, hyperlinks, and ISO timestamps.
 When run in the home directory without --all, the standard clutter
-(Music, Movies, Pictures, Videos, Applications, Desktop, Library) is
+(Music, Movies, Pictures, Videos, Applications, Desktop, Library, go) is
 hidden from the listing. All extra arguments are passed to eza
 unchanged.
 

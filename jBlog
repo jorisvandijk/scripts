@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jBlog 1.0
+#	jBlog 3.0
 #	Write and publish a Hugo blog post
 #	Dependencies: hugo, zeditor, fzf, git
 #	Keywords: write, post, article, hugo, publish, draft, blog
@@ -21,8 +21,7 @@ DEST=""
 DRAFT_FILE=""
 
 _preflight() {
-    j::require hugo git fzf
-    command -v zeditor &>/dev/null || j::die "zeditor is not on PATH"
+    j::require hugo git fzf zeditor
     cd "$WEBSITE_DIR" || j::die "Could not cd to $WEBSITE_DIR"
 }
 
@@ -30,6 +29,7 @@ _find_draft() {
     shopt -s nullglob
     local drafts=("$WEBSITE_DIR/content/posts/untitled-"*.md)
     shopt -u nullglob
+    [[ ${#drafts[@]} -gt 1 ]] && j::warn "Found ${#drafts[@]} drafts — using oldest; others may need cleanup"
     [[ ${#drafts[@]} -gt 0 ]] && echo "${drafts[0]}"
 }
 
@@ -55,11 +55,13 @@ _ensure_server() {
 _wait_for_server() {
     local url="$1"
     local attempts=0
+    j::info "Waiting for Hugo server..."
     until curl -sf "$url" &>/dev/null; do
         sleep 0.3
         attempts=$((attempts + 1))
         [[ $attempts -gt 60 ]] && j::die "Hugo server failed to start"
     done
+    j::info "Server ready."
 }
 
 _start_server() {
@@ -82,16 +84,21 @@ _update_front_matter() {
     local draft_file="$1"
     local title="$2"
     local now; now="$(date "+%Y-%m-%dT%H:%M:%S%z" | sed 's/\([+-][0-9][0-9]\)\([0-9][0-9]\)$/\1:\2/')"
-    sed -i '' "s|^title:.*|title: \"${title}\"|" "$draft_file"
+    POST_TITLE="$title" perl -i -pe 'BEGIN{$t=delete $ENV{POST_TITLE}} s/^title:.*$/title: "$t"/' "$draft_file"
     sed -i '' "s|^date:.*|date: ${now}|"         "$draft_file"
     sed -i '' 's/^draft: true/draft: false/'      "$draft_file"
 }
 
+_prompt_title() {
+    while [[ -z "$TITLE" ]]; do
+        j::prompt "Post title:"
+        read -r TITLE
+    done
+}
+
 _finish_post() {
     local draft_file="$1"
-    while [[ -z "$TITLE" ]]; do
-        read -r -p "Post title: " TITLE
-    done
+    _prompt_title
     local slug; slug="$(_slugify "$TITLE")"
     DEST="$WEBSITE_DIR/content/posts/${slug}.md"
     [[ -e "$DEST" ]] && j::die "A post already exists at ${DEST} — draft preserved at ${draft_file}"
@@ -114,10 +121,17 @@ _pick_tags() {
         --height=~40% --layout=reverse 2>/dev/null
 }
 
+_write_tags() {
+    local tags_str="$1"
+    sed -i '' "s|^tags:.*|tags: [${tags_str}]|" "$DEST"
+    j::info "Tags: ${tags_str}"
+}
+
 _select_tags() {
     local chosen; chosen="$(_pick_tags "$(_existing_tags)")"
     local new_input
-    read -r -p "New tags (space-separated, Enter to skip): " new_input
+    j::prompt "New tags (space-separated, Enter to skip):"
+    read -r new_input
 
     local all_tags=() tag
     while IFS= read -r tag; do
@@ -134,15 +148,11 @@ _select_tags() {
         tags_str+="\"${tag}\", "
     done
     tags_str="${tags_str%, }"
-
-    sed -i '' "s|^tags:.*|tags: [${tags_str}]|" "$DEST"
-    j::info "Tags: ${tags_str}"
+    _write_tags "$tags_str"
 }
 
 _push() {
-    local push_answer
-    read -r -p "Push to git? [Y/n] " push_answer
-    [[ "${push_answer,,}" == "n" ]] && return 0
+    j::confirm "Push to git?" N || { j::info "Post saved locally at $DEST — commit and push manually when ready"; return 0; }
     git add "$DEST" || j::die "Failed to stage post"
     git commit -m "Add post: ${TITLE}" || j::die "Failed to commit post"
     git push || j::die "Failed to push post"

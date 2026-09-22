@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jOpenFzf 2.1
+#	jOpenFzf 3.0
 #	Select files with fzf and open them in micro
 #	Dependencies: fzf, bat, micro
 #	Keywords: open, browse, pick, file picker, edit, micro
@@ -16,6 +16,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 
 j::require fzf bat micro
 
+j::info "Searching from $HOME"
 cd || j::die "Could not cd to $HOME"
 
 mapfile -t FILES < <(fzf -m --preview="bat --color=always {}")

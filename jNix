@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jNix 1.1
+#	jNix 3.0
 #	Navigate and edit nix configuration files
 #	Dependencies: fzf, bat, micro
 #	Keywords: nix, configuration, nixos, packages, edit config
@@ -28,7 +28,7 @@ TYPE_FILTER="${1:-all}"
 
 _parse_packages() {
     [[ ! -f "$NIX_PACKAGES" ]] && return
-    grep -n '^\s\+[a-zA-Z_][a-zA-Z0-9_".-]*\s*$' "$NIX_PACKAGES" | \
+    grep -En '^\s+[a-zA-Z_][a-zA-Z0-9_".-]*\s*$' "$NIX_PACKAGES" | \
     while IFS=: read -r linenum name; do
         name="${name//[[:space:]]/}"
         name="${name//\"/}"
@@ -46,8 +46,8 @@ _parse_homebrew() {
         /^\s+[\]\}]/   { section="";    next }
         section == "" { next }
         /"[^"]+"/ {
-            n = split($0, a, "\"")
-            if (n >= 2) print section "\t" a[2] "\t" NR
+            field_count = split($0, fields, "\"")
+            if (field_count >= 2) print section "\t" fields[2] "\t" NR
         }
     ' "$NIX_HOMEBREW" | while IFS=$'\t' read -r section name linenum; do
         printf '[%s]\t%-30s\t%s\t%s\n' "$section" "$name" "$NIX_HOMEBREW" "$linenum"
@@ -68,14 +68,14 @@ _parse_shell() {
             key = $0
             gsub(/^[[:space:]]+/, "", key)
             gsub(/[[:space:]]*=.*$/, "", key)
-            n = split($0, a, "\"")
-            if (n >= 2) print section "\t" key " = " a[2] "\t" NR
+            field_count = split($0, fields, "\"")
+            if (field_count >= 2) print section "\t" key " = " fields[2] "\t" NR
             next
         }
         section != "var" && /"[^"]+" = / {
-            n = split($0, a, "\"")
-            if (n >= 4) print section "\t" a[2] " = " a[4] "\t" NR
-            else if (n >= 2) print section "\t" a[2] "\t" NR
+            field_count = split($0, fields, "\"")
+            if (field_count >= 4) print section "\t" fields[2] " = " fields[4] "\t" NR
+            else if (field_count >= 2) print section "\t" fields[2] "\t" NR
         }
     ' "$NIX_SHELL" | while IFS=$'\t' read -r section display linenum; do
         printf '[%s]\t%-30s\t%s\t%s\n' "$section" "$display" "$NIX_SHELL" "$linenum"
@@ -125,14 +125,12 @@ _build_list() {
 }
 
 _prompt_rebuild() {
-    local answer
-    printf '\n'
-    j::info "Rebuild now? (sudo darwin-rebuild switch --flake ${NIX_DIR}/#macbook) [Y/n] "
-    read -r answer
-    case "${answer:-Y}" in
-        [Yy]*) sudo darwin-rebuild switch --flake "${NIX_DIR}/#macbook" ;;
-        *)     j::info "Skipped rebuild" ;;
-    esac
+    j::msg ""
+    j::confirm "Rebuild now? (sudo darwin-rebuild switch --flake ${NIX_DIR}/#macbook)" Y || {
+        j::info "Skipped rebuild"
+        return
+    }
+    sudo darwin-rebuild switch --flake "${NIX_DIR}/#macbook"
 }
 
 _open_in_editor() {
@@ -158,6 +156,5 @@ SELECTION=$(_build_list | fzf \
 
 [[ -z "$SELECTION" ]] && exit 0
 
-FILE="$(printf '%s' "$SELECTION" | cut -f3)"
-LINE="$(printf '%s' "$SELECTION" | cut -f4)"
+IFS=$'\t' read -r ENTRY_TYPE ENTRY_NAME FILE LINE <<< "$SELECTION"
 _open_in_editor "$FILE" "$LINE" && _prompt_rebuild
