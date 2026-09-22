@@ -25,6 +25,10 @@ Output format:
 Multiple inputs are processed in sequence; a failed lookup skips that
 entry and continues with the rest. No API key is required.
 
+The output is also copied to the system clipboard automatically. On macOS
+this uses pbcopy. On Linux it tries xclip, xsel, and wl-copy in that order;
+a warning is printed if none are available.
+
 EXAMPLES
 
     jTube @veritasium
@@ -38,4 +42,4 @@ EXAMPLES
 
 KEYWORDS
 
-    youtube, channel, id, rss, nix, feed, subscribe, newsboat
+    youtube, channel, id, rss, nix, feed, subscribe, newsboat, clipboard, pbcopy, xclip

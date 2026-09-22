@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jTube 3.0
+#	jTube 3.1
 #	Resolve YouTube channel IDs and output Nix RSS feed entries
 #	Dependencies: curl
 #	Keywords: youtube, channel, id, rss, nix, feed, subscribe
@@ -53,6 +53,23 @@ _extract_channel_title() {
     printf '%s' "$title"
 }
 
+_linux_clipboard() {
+    local content="$1"
+    command -v xclip   &>/dev/null && { printf '%s' "$content" | xclip -selection clipboard; return; }
+    command -v xsel    &>/dev/null && { printf '%s' "$content" | xsel --clipboard --input;   return; }
+    command -v wl-copy &>/dev/null && { printf '%s' "$content" | wl-copy;                    return; }
+    j::warn "No clipboard tool found (install xclip, xsel, or wl-copy)"
+    return 1
+}
+
+_copy_to_clipboard() {
+    local content="$1"
+    case "$(j::os)" in
+        macos) printf '%s' "$content" | pbcopy ;;
+        linux) _linux_clipboard "$content" ;;
+    esac
+}
+
 _format_nix_line() {
     local channel_id="$1"
     local title="$2"
@@ -75,6 +92,12 @@ _process_channel() {
     _format_nix_line "$channel_id" "$title"
 }
 
+LINES=()
 for ARG in "$@"; do
-    _process_channel "$ARG"
+    LINE=$(_process_channel "$ARG") || continue
+    printf '%s\n' "$LINE"
+    LINES+=("$LINE")
 done
+
+[[ ${#LINES[@]} -eq 0 ]] && exit 0
+_copy_to_clipboard "$(printf '%s\n' "${LINES[@]}")"

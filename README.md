@@ -201,8 +201,6 @@ Add every new script to the `## Scripts` table below.
 | Scripts directory | `~/git/scripts/` |
 | Man pages | `~/git/scripts/man/` |
 | Git repos scanned by jRepos | `~/git/` |
-| Nix config (jNix) | `~/Git/nix/` |
-| Gojo project (jGojo) | `~/git/gojo/` |
 | Hugo site (jHugoHelper) | `~/git/website/` |
 | jNewRepo API config | `~/git/documents/newrepo/config` |
 | Dotfiles repo (jTidy) | `~/git/macbook/` |
@@ -219,13 +217,11 @@ Add every new script to the `## Scripts` table below.
 | `jFindApp` | Search for an app across App Store, Homebrew, and Nix |
 | `jExtract` | Smart archive extraction |
 | `jFlac2Alac` | Batch-convert FLAC files to Apple Lossless (ALAC) |
-| `jGojo` | Build gojo for Linux and deploy it to the gojo server |
 | `jHeic2Png` | Convert HEIC images to PNG |
 | `jHugoHelper` | Hugo site helper: server, new post, new status |
 | `jList` | Directory listing with eza |
 | `jLxc` | Toggle Proxmox LXC containers on/off |
 | `jNewRepo` | Initialize a local git repo and create it on GitHub, GitLab, Codeberg, and Bitbucket |
-| `jNix` | Navigate and edit nix configuration files |
 | `jOpenFzf` | Select files with fzf and open them in micro |
 | `jPush` | Stage, commit, and push to Git |
 | `jRename` | Rename files in current directory: lowercase, spaces and underscores to hyphens |
