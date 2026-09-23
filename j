@@ -10,13 +10,13 @@
 
 J_RED='' J_GREEN='' J_YELLOW='' J_RESET='' J_BOLD='' J_DIM='' J_CYAN=''
 [[ -t 1 && -z "${NO_COLOR:-}" ]] && {
-    J_RED='\033[0;31m'
-    J_GREEN='\033[0;32m'
-    J_YELLOW='\033[0;33m'
-    J_RESET='\033[0m'
-    J_BOLD='\033[1m'
-    J_DIM='\033[2m'
-    J_CYAN='\033[36m'
+    J_RED=$'\033[0;31m'
+    J_GREEN=$'\033[0;32m'
+    J_YELLOW=$'\033[0;33m'
+    J_RESET=$'\033[0m'
+    J_BOLD=$'\033[1m'
+    J_DIM=$'\033[2m'
+    J_CYAN=$'\033[36m'
 }
 
 _j_cap() { local text="$*"; printf '%s' "${text^}"; }
