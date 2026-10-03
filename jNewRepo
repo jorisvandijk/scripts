@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jNewRepo 3.0
+#	jNewRepo 3.1
 #	Initialize a local git repo and create it on GitHub, GitLab, Codeberg, and Bitbucket
 #	Dependencies: git, curl
 #	Keywords: github, gitlab, codeberg, bitbucket, create, initialize, new repo
@@ -68,16 +68,22 @@ _check_exists() {
     esac
 }
 
+_parse_error_msg() {
+    local tmpfile="$1"
+    local raw_msg msg
+    raw_msg=$(grep -o '"message":"[^"]*"' "$tmpfile" 2>/dev/null | head -1)
+    msg="${raw_msg#*:\"}"; msg="${msg%\"}"
+    printf '%s' "$msg"
+}
+
 _create_repo() {
     local label; label="$(printf '%-*s' "$LABEL_WIDTH" "$1")"
     local url="$2" body="$3"; shift 3
     local tmpfile; tmpfile="$(mktemp)"
-    local http_code msg raw_msg
+    local http_code
     http_code=$(curl -s -o "$tmpfile" -w "%{http_code}" -X POST "$@" -d "$body" "$url")
     [[ "$http_code" == "200" || "$http_code" == "201" ]] || {
-        raw_msg=$(grep -o '"message":"[^"]*"' "$tmpfile" 2>/dev/null | head -1)
-        msg="${raw_msg#*:\"}"; msg="${msg%\"}"
-        j::error "$label failed (HTTP $http_code: $msg)"
+        j::error "$label failed (HTTP $http_code: $(_parse_error_msg "$tmpfile"))"
         rm -f "$tmpfile"
         return 1
     }

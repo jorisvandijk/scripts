@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jBlog 3.1
+#	jBlog 3.3
 #	Write and publish a Hugo blog post
 #	Dependencies: hugo, zeditor, git, fzf
 #	Keywords: write, post, article, hugo, publish, draft, blog
@@ -83,7 +83,8 @@ _slugify() {
 _update_front_matter() {
     local draft_file="$1"
     local title="$2"
-    local now; now="$(date "+%Y-%m-%dT%H:%M:%S%z" | sed 's/\([+-][0-9][0-9]\)\([0-9][0-9]\)$/\1:\2/')"
+    local now; now="$(date "+%Y-%m-%dT%H:%M:%S%z")"
+    now="${now::-2}:${now: -2}"
     POST_TITLE="$title" perl -i -pe 'BEGIN{$t=delete $ENV{POST_TITLE}} s/^title:.*$/title: "$t"/' "$draft_file"
     sed -i '' "s|^date:.*|date: ${now}|"         "$draft_file"
     sed -i '' 's/^draft: true/draft: false/'      "$draft_file"
@@ -125,6 +126,14 @@ _write_tags() {
     j::info "Tags: ${tags_str}"
 }
 
+_format_tag_string() {
+    local result="" tag
+    for tag in "$@"; do
+        result+="\"${tag}\", "
+    done
+    printf '%s' "${result%, }"
+}
+
 _select_tags() {
     local chosen; chosen="$(_pick_tags "$(_existing_tags)")"
     local new_input
@@ -140,13 +149,7 @@ _select_tags() {
     done
 
     [[ ${#all_tags[@]} -eq 0 ]] && return 0
-
-    local tags_str=""
-    for tag in "${all_tags[@]}"; do
-        tags_str+="\"${tag}\", "
-    done
-    tags_str="${tags_str%, }"
-    _write_tags "$tags_str"
+    _write_tags "$(_format_tag_string "${all_tags[@]}")"
 }
 
 _push() {

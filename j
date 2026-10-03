@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	j 3.2
+#	j 3.5
 #	j-scripts shared library and CLI tooling
 #	Dependencies: none
 #	Keywords: library, cli, help, list, new, man
@@ -37,7 +37,7 @@ _j_cap() { local text="$*"; printf '%s' "${text^}"; }
 j::info()  { printf "${J_GREEN}[INFO]${J_RESET} %s\n"     "$(_j_cap "$*")"; }
 j::warn()  { printf "${J_YELLOW}[WARNING]${J_RESET} %s\n" "$(_j_cap "$*")" >&2; }
 j::error() { printf "${J_RED}[ERROR]${J_RESET} %s\n"      "$(_j_cap "$*")" >&2; }
-j::die()   { printf "${J_RED}Error: %s${J_RESET}\n"        "$(_j_cap "$*")" >&2; exit 1; }
+j::die()   { j::error "$*"; exit 1; }
 j::row()   { printf "${1}%-20s %s${J_RESET}\n" "$2" "$3"; }
 
 j::require() {
@@ -83,7 +83,9 @@ j::edit_or_discard() {
 j::version() {
     local script="$1"
     [[ -f "$script" ]] || j::die "File not found: $script"
-    sed -n '2s/^#\t*//p' "$script"
+    local lines
+    mapfile -n 2 -t lines < "$script"
+    printf '%s\n' "${lines[1]#$'#\t'}"
 }
 
 j::pick() {
@@ -125,12 +127,22 @@ j::show_man() {
     ${PAGER:-less} "$man_file"
 }
 
+_j_extract_section() {
+    local file="$1" section="$2"
+    local found=false line
+    while IFS= read -r line; do
+        [[ "$line" == "$section" ]] && { found=true; continue; }
+        [[ "$found" == true && "$line" =~ ^[A-Z]+$ ]] && break
+        [[ "$found" == true ]] && printf '%s\n' "$line"
+    done < "$file"
+}
+
 j::help() {
     local name="$1"
     local script_dir; script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
     local man_file="${script_dir}/man/${name}.txt"
     [[ ! -f "$man_file" ]] && j::die "No help available for ${name}"
-    awk '/^SYNOPSIS$/{found=1; next} found && /^[A-Z]+$/{exit} found{print}' "$man_file"
+    _j_extract_section "$man_file" "SYNOPSIS"
 }
 
 [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 0
@@ -142,13 +154,13 @@ _j_script_dir() {
 _j_read_keywords() {
     local man_file="$1"
     [[ -f "$man_file" ]] || return 0
-    awk '/^KEYWORDS$/{found=1; next}
-         found && /^[A-Z]+$/{exit}
-         found && /[^[:space:]]/{
-             gsub(/^[[:space:]]+/, "")
-             result = result (length(result) ? " " : "") $0
-         }
-         END{print result}' "$man_file"
+    local result="" trimmed line
+    while IFS= read -r line; do
+        [[ "$line" =~ [^[:space:]] ]] || continue
+        read -r trimmed <<< "$line"
+        result="${result:+$result }$trimmed"
+    done < <(_j_extract_section "$man_file" "KEYWORDS")
+    [[ -n "$result" ]] && printf '%s\n' "$result"
 }
 
 _j_list() {
@@ -158,7 +170,8 @@ _j_list() {
         [[ -f "$script" && -x "$script" ]] || continue
         name="${script##*/}"
         [[ "$name" != "j" && ! "$name" =~ ^j[A-Z][a-zA-Z0-9]*$ ]] && continue
-        desc="$(sed -n '3s/^#\t//p' "$script")"
+        local lines; mapfile -n 3 -t lines < "$script"
+        desc="${lines[2]#$'#\t'}"
         printf '%-22s - %s\n' "$name" "${desc:-(no description)}"
     done
 }
@@ -170,7 +183,8 @@ _j_entries() {
         [[ -f "$script" && -x "$script" ]] || continue
         name="${script##*/}"
         [[ "$name" == "j" || ! "$name" =~ ^j[A-Z][a-zA-Z0-9]*$ ]] && continue
-        desc="$(sed -n '3s/^#\t//p' "$script")"
+        local lines; mapfile -n 3 -t lines < "$script"
+        desc="${lines[2]#$'#\t'}"
         keywords="$(_j_read_keywords "${script_dir}/man/${name}.txt")"
         kw_display=""
         [[ -n "$keywords" ]] && kw_display=$'  \033[2m'"${keywords}"$'\033[0m'

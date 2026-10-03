@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jLxc 3.1
+#	jLxc 3.2
 #	Toggle Proxmox LXC containers on/off
 #	Dependencies: fzf, ssh
 #	Keywords: lxc, container, proxmox, vm, toggle, start, stop
@@ -30,11 +30,12 @@ _format_container_row() {
 
 _build_fzf_input() {
 	local raw="$1"
-	local vmid status name
-	while IFS= read -r line; do
-		read -r vmid status name _ <<< "$line"
+	local lines=() line vmid status name rest
+	mapfile -t lines <<< "$raw"
+	for line in "${lines[@]:1}"; do
+		read -r vmid status name rest <<< "$line"
 		_format_container_row "$name" "$vmid" "$status"
-	done < <(tail -n +2 <<< "$raw")
+	done
 }
 
 _pick_container() {

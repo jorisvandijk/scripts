@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jTidy 3.1
+#	jTidy 3.2
 #	Audit the macOS home directory and guide an interactive cleanup
 #	Dependencies: fzf, brew, du, df, find
 #	Keywords: cleanup, organize, home directory, dotfiles, audit, declutter
@@ -118,7 +118,7 @@ _format_config_entry() {
     local name size lower
     name="${dir%/}"; name="${name##*/}"
     size=$(du -sh "$dir" 2>/dev/null | awk '{print $1}')
-    lower=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')
+    lower="${name,,}"
     if grep -qi -- "^${lower}\(-\|_\|$\)" <<< "$haystack"; then
         printf "  %-28s %-8s ${J_GREEN}installed${J_RESET}\n" "$name" "$size"
     else
@@ -143,7 +143,7 @@ _collect_orphan_configs() {
     for dir in ~/.config/*/; do
         [[ -e "$dir" ]] || continue
         name="${dir%/}"; name="${name##*/}"
-        lower=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')
+        lower="${name,,}"
         grep -qi -- "^${lower}\(-\|_\|$\)" <<< "$haystack" && continue
         ORPHAN_CONFIGS+=("$dir")
     done

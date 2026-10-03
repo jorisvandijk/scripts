@@ -7,9 +7,7 @@ SYNOPSIS
     Options:
       -h, --help      Show this help
       -v, --version   Show version
-
-    Run without flags to download to ~/Downloads (or DOWNLOAD_DIR).
-    Pass --homelab to trigger download on HOMELAB_HOST instead.
+      --homelab       Download to homelab instead of ~/Downloads
 
 DESCRIPTION
 

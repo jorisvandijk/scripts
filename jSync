@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jSync 3.1
+#	jSync 3.2
 #	Interactively sync files to or from a server via rsync
 #	Dependencies: fzf, rsync, ssh
 #	Keywords: sync, rsync, server, upload, download, transfer, copy, files, push, pull
@@ -46,15 +46,14 @@ _do_pull() {
 }
 
 _flow_push() {
-    local selected_items=() server_dir server_dirs
+    local selected_items=() server_dir server_dirs items=()
 
     server_dirs=$(_list_server_dirs)
     [[ -z "$server_dirs" ]] && j::die "Cannot connect to ${SERVER_HOST} or no directories in ${SERVER_ROOT}"
 
     while true; do
-        mapfile -t selected_items < <(
-            find . -maxdepth 1 -mindepth 1 | sed 's|^\./||' | sort | j::pick "Local" multi
-        )
+        mapfile -t items < <(find . -maxdepth 1 -mindepth 1 | sort)
+        mapfile -t selected_items < <(printf '%s\n' "${items[@]#./}" | j::pick "Local" multi)
         [[ ${#selected_items[@]} -eq 0 ]] && return 1
 
         server_dir=$(printf '%s\n' "$server_dirs" | j::pick "Server dir" single)
