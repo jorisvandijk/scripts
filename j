@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	j 3.1
+#	j 3.2
 #	j-scripts shared library and CLI tooling
 #	Dependencies: none
 #	Keywords: library, cli, help, list, new, man
@@ -139,6 +139,18 @@ _j_script_dir() {
     cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P
 }
 
+_j_read_keywords() {
+    local man_file="$1"
+    [[ -f "$man_file" ]] || return 0
+    awk '/^KEYWORDS$/{found=1; next}
+         found && /^[A-Z]+$/{exit}
+         found && /[^[:space:]]/{
+             gsub(/^[[:space:]]+/, "")
+             result = result (length(result) ? " " : "") $0
+         }
+         END{print result}' "$man_file"
+}
+
 _j_list() {
     local script_dir; script_dir="$(_j_script_dir)"
     local script name desc
@@ -153,14 +165,16 @@ _j_list() {
 
 _j_entries() {
     local script_dir="$1"
-    local script name desc keywords
+    local script name desc keywords kw_display
     for script in "${script_dir}"/*; do
         [[ -f "$script" && -x "$script" ]] || continue
         name="${script##*/}"
         [[ "$name" == "j" || ! "$name" =~ ^j[A-Z][a-zA-Z0-9]*$ ]] && continue
         desc="$(sed -n '3s/^#\t//p' "$script")"
-        keywords="$(grep -m1 $'^#\tKeywords: ' "$script" | sed 's/^#\tKeywords: //')"
-        printf '%s\t%s\t%s\n' "$name" "${desc:-(no description)}" "${keywords}"
+        keywords="$(_j_read_keywords "${script_dir}/man/${name}.txt")"
+        kw_display=""
+        [[ -n "$keywords" ]] && kw_display=$'  \033[2m'"${keywords}"$'\033[0m'
+        printf '%s\t%s%s\n' "$name" "${desc:-(no description)}" "$kw_display"
     done
 }
 

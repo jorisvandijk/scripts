@@ -63,4 +63,4 @@ EXAMPLES
 KEYWORDS
 
     gog, download, games, library, backup, installer, homelab,
-    cyberpunk, witcher, remote, ssh, lgogdownloader
+    remote, ssh, lgogdownloader
