@@ -1,0 +1,66 @@
+NAME
+    jGog - Browse GOG library and download games locally or to homelab
+
+SYNOPSIS
+    jGog [--homelab]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+    Run without flags to download to ~/Downloads (or DOWNLOAD_DIR).
+    Pass --homelab to trigger download on HOMELAB_HOST instead.
+
+DESCRIPTION
+
+Browse your GOG library with fzf, select a game, choose one or more
+download types, and download the files either locally or directly on
+a remote homelab over SSH.
+
+Configuration is hardcoded near the top of the script:
+
+    DOWNLOAD_DIR   Local destination (default: ~/Downloads)
+    HOMELAB_HOST   SSH target for --homelab mode (user@host)
+    HOMELAB_PATH   Download path on the homelab
+
+Authentication uses lgogdownloader's built-in OAuth2 login. On first
+run, lgogdownloader will open a browser-based login flow and store
+the session credentials in ~/.config/lgogdownloader/.
+
+Homelab prerequisites:
+
+    lgogdownloader must be installed on HOMELAB_HOST. If not found,
+    jGog will exit with: apt install lgogdownloader
+
+    If no GOG credentials are found on HOMELAB_HOST, jGog will offer
+    to copy cookies.txt and galaxy_tokens.json from the local machine
+    via scp.
+
+Download menu:
+
+    The file list is fetched live from lgogdownloader --status, so
+    only entries that actually exist for the selected game are shown.
+
+    [Windows] name (N files)   Windows installer (exe + bin parts grouped)
+    [macOS]   name (1 file)    macOS installer (.pkg)
+    [Linux]   name (1 file)    Linux installer (.sh)
+    [Extras]  name (N files)   All non-installer files (soundtracks, artbooks, etc.)
+
+    Multiple entries can be selected with TAB. Already-downloaded
+    files are skipped automatically by lgogdownloader.
+
+EXAMPLES
+
+    jGog
+        Open game picker, select download types, download to ~/Downloads.
+
+    jGog --homelab
+        Open game picker, select download types, download on homelab.
+
+    jGog --help
+        Show this synopsis.
+
+KEYWORDS
+
+    gog, download, games, library, backup, installer, homelab,
+    cyberpunk, witcher, remote, ssh, lgogdownloader

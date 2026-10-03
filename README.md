@@ -217,6 +217,7 @@ Add every new script to the `## Scripts` table below.
 | `jFindApp` | Search for an app across App Store, Homebrew, and Nix |
 | `jExtract` | Smart archive extraction |
 | `jFlac2Alac` | Batch-convert FLAC files to Apple Lossless (ALAC) |
+| `jGog` | Browse GOG library and download games locally or to homelab |
 | `jHeic2Png` | Convert HEIC images to PNG |
 | `jHugoHelper` | Hugo site helper: server, new post, new status |
 | `jList` | Directory listing with eza |

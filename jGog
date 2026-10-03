@@ -1,0 +1,219 @@
+#!/usr/bin/env bash
+#	jGog 3.3
+#	Browse GOG library and download games locally or to homelab
+#	Dependencies: lgogdownloader, fzf, ssh
+#	Keywords: gog, download, games, library, backup, installer, homelab
+#	Usage: jGog [--homelab]
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jGog" && exit 0
+[[ -n "$1" && "$1" != "--homelab" ]]      && j::die "Usage: jGog [--homelab]"
+
+DOWNLOAD_DIR="${HOME}/Downloads"
+HOMELAB_HOST="joris@192.168.1.5"
+HOMELAB_PATH="/data/games/gog/"
+
+_ensure_login() {
+    local cred_file="${HOME}/.config/lgogdownloader/cookies.txt"
+    [[ -s "$cred_file" ]] && return 0
+    j::info "No GOG credentials found. Starting login..."
+    lgogdownloader --login || j::die "GOG login failed"
+}
+
+_fetch_library() {
+    lgogdownloader --list --no-color 2>/dev/null
+}
+
+_parse_library_line() {
+    local line="$1" game_id display_title
+    # Format: "game_id" or "game_id [N]"  (N = number of extras)
+    game_id="${line%% *}"           # strip " [N]" suffix (everything from first space)
+    [[ -z "$game_id" ]] && return 1
+    display_title="${game_id//_/ }" # underscores → spaces for readability
+    printf '%s\t%s\n' "$display_title" "$game_id"
+}
+
+_format_library() {
+    local raw="$1"
+    while IFS= read -r line; do
+        _parse_library_line "$line"
+    done <<< "$raw"
+}
+
+_pick_game() {
+    local formatted="$1"
+    printf '%s\n' "$formatted" | fzf \
+        --no-multi \
+        --delimiter=$'\t' \
+        --with-nth=1 \
+        --prompt="GOG » " \
+        --height=90% \
+        --reverse \
+        --header="Select a game  (ENTER to confirm, ESC to exit)"
+}
+
+_fetch_game_files() {
+    local game_id="$1"
+    lgogdownloader --status --game "^${game_id}$" --no-color 2>/dev/null
+}
+
+_parse_status_files() {
+    local raw="$1"
+    local status_code status_game filename
+    while IFS= read -r line; do
+        read -r status_code status_game filename <<< "$line"
+        [[ -n "$filename" ]] && printf '%s\n' "$filename"
+    done <<< "$raw"
+}
+
+_build_file_menu() {
+    local game_id="$1" file_list="$2"
+    local -a files=()
+    local -A grouped=()
+    local filename base part_count part_label
+
+    mapfile -t files <<< "$file_list"
+
+    # Windows: .exe stubs grouped with their .bin parts
+    for filename in "${files[@]}"; do
+        [[ "$filename" != *.exe ]] && continue
+        base="${filename%.exe}"
+        part_count=1
+        for part in "${files[@]}"; do
+            [[ "$part" == "${base}-"*.bin ]] && (( part_count++ )) && grouped["$part"]=1
+        done
+        if (( part_count == 1 )); then part_label="1 file"; else part_label="${part_count} files"; fi
+        printf '%s\t%s\t%s\n' "[Windows] ${base} (${part_label})" "installer" "--platform w --include bi"
+        grouped["$filename"]=1
+    done
+
+    # macOS: .pkg installers
+    for filename in "${files[@]}"; do
+        [[ "$filename" != *.pkg ]] && continue
+        printf '%s\t%s\t%s\n' "[macOS] ${filename%.pkg} (1 file)" "installer" "--platform m --include bi"
+        grouped["$filename"]=1
+    done
+
+    # Linux: .sh installers
+    for filename in "${files[@]}"; do
+        [[ "$filename" != *.sh ]] && continue
+        printf '%s\t%s\t%s\n' "[Linux] ${filename%.sh} (1 file)" "installer" "--platform l --include bi"
+        grouped["$filename"]=1
+    done
+
+    # Extras: group all remaining files into one entry
+    local -a extra_files=()
+    for filename in "${files[@]}"; do
+        [[ "${grouped[$filename]+_}" ]] && continue
+        extra_files+=("$filename")
+    done
+    if (( ${#extra_files[@]} > 0 )); then
+        local extra_count="${#extra_files[@]}"
+        local extra_label
+        if (( extra_count == 1 )); then
+            extra_label="[Extras] ${extra_files[0]} (1 file)"
+        else
+            extra_label="[Extras] ${extra_files[0]} + $(( extra_count - 1 )) more (${extra_count} files)"
+        fi
+        printf '%s\t%s\t%s\n' "$extra_label" "installer" "--include e"
+    fi
+}
+
+_pick_downloads() {
+    local game_title="$1" menu="$2"
+    printf '%s\n' "$menu" | fzf \
+        -m \
+        --delimiter=$'\t' \
+        --with-nth=1 \
+        --prompt="Download » " \
+        --height=90% \
+        --reverse \
+        --header="Downloads for: ${game_title}  (TAB to multi-select, ENTER to confirm)"
+}
+
+_run_installer() {
+    local game_id="$1" flags="$2" download_label="$3"
+    j::info "Downloading ${download_label}..."
+    if [[ "$USE_HOMELAB" == true ]]; then
+        # flags is an internal, trusted string of lgogdownloader options — word-split is intentional
+        # shellcheck disable=SC2086
+        ssh "$HOMELAB_HOST" -- lgogdownloader --download --game "^${game_id}$" $flags --directory "$HOMELAB_PATH" \
+            || j::error "Download failed (${download_label})"
+    else
+        # shellcheck disable=SC2086
+        lgogdownloader --download --game "^${game_id}$" $flags --directory "$DOWNLOAD_DIR" \
+            || j::error "Download failed (${download_label})"
+    fi
+}
+
+_homelab_has_lgogdownloader() {
+    ssh "$HOMELAB_HOST" "command -v lgogdownloader" &>/dev/null
+}
+
+_homelab_has_credentials() {
+    ssh "$HOMELAB_HOST" "test -s ~/.config/lgogdownloader/galaxy_tokens.json" 2>/dev/null
+}
+
+_copy_credentials_to_homelab() {
+    local cred_dir="${HOME}/.config/lgogdownloader"
+    ssh "$HOMELAB_HOST" "mkdir -p ~/.config/lgogdownloader"
+    scp "${cred_dir}/cookies.txt" "${cred_dir}/galaxy_tokens.json" \
+        "${HOMELAB_HOST}:~/.config/lgogdownloader/" \
+        || j::die "Failed to copy credentials to ${HOMELAB_HOST}"
+    j::info "Credentials copied to ${HOMELAB_HOST}"
+}
+
+_check_homelab() {
+    _homelab_has_lgogdownloader \
+        || j::die "lgogdownloader not found on ${HOMELAB_HOST}. Install it first: apt install lgogdownloader"
+    _homelab_has_credentials && return 0
+    j::warn "No GOG credentials found on ${HOMELAB_HOST}."
+    j::confirm "Copy credentials from this machine to ${HOMELAB_HOST}?" N \
+        || j::die "Credentials required on homelab to download remotely"
+    _copy_credentials_to_homelab
+}
+
+USE_HOMELAB=false
+[[ "$1" == "--homelab" ]] && USE_HOMELAB=true
+
+j::require lgogdownloader fzf
+[[ "$USE_HOMELAB" == true ]] && j::require ssh
+
+_ensure_login
+
+LIBRARY=$(_fetch_library)
+[[ -z "$LIBRARY" ]] && j::die "Could not fetch GOG library. Check your connection."
+
+FORMATTED_LIBRARY=$(_format_library "$LIBRARY")
+[[ -z "$FORMATTED_LIBRARY" ]] && j::die "Failed to parse library listing. If lgogdownloader --list output changed, update _parse_library_line."
+
+SELECTED_GAME=$(_pick_game "$FORMATTED_LIBRARY")
+[[ -z "$SELECTED_GAME" ]] && exit 0
+
+IFS=$'\t' read -r GAME_TITLE GAME_ID <<< "$SELECTED_GAME"
+
+j::info "Fetching available files for ${GAME_TITLE}..."
+STATUS_RAW=$(_fetch_game_files "$GAME_ID")
+[[ -z "$STATUS_RAW" ]] && j::die "Could not fetch file list for ${GAME_TITLE}. Check your connection."
+
+FILE_LIST=$(_parse_status_files "$STATUS_RAW")
+FILE_MENU=$(_build_file_menu "$GAME_ID" "$FILE_LIST")
+[[ -z "$FILE_MENU" ]] && j::die "No downloadable files found for ${GAME_TITLE}."
+
+mapfile -t SELECTED_DOWNLOADS < <(_pick_downloads "$GAME_TITLE" "$FILE_MENU")
+[[ ${#SELECTED_DOWNLOADS[@]} -eq 0 ]] && exit 0
+
+[[ "$USE_HOMELAB" == true ]] && _check_homelab
+
+for SELECTED in "${SELECTED_DOWNLOADS[@]}"; do
+    IFS=$'\t' read -r DOWNLOAD_LABEL DOWNLOAD_TYPE DOWNLOAD_ARG <<< "$SELECTED"
+    case "$DOWNLOAD_TYPE" in
+        installer) _run_installer "$GAME_ID" "$DOWNLOAD_ARG" "$DOWNLOAD_LABEL" ;;
+        *)         j::error "Unknown download type: ${DOWNLOAD_TYPE}" ;;
+    esac
+done
