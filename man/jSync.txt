@@ -1,0 +1,34 @@
+NAME
+    jSync - interactively sync files to or from a server via rsync
+
+SYNOPSIS
+    jSync [options]
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+Launches an interactive fzf-driven workflow for rsyncing files between
+the local machine and the server at joris@192.168.1.5.
+
+On launch, choose push (local → server) or pull (server → local).
+
+Push: select files from the current directory with fzf, then pick a
+destination directory under /data on the server. ESC on the destination
+picker goes back to the file picker.
+
+Pull: pick a source directory under /data on the server, then select
+files within it. ESC on the file picker goes back to the directory picker.
+
+The local side always reads from or writes to the current working directory.
+
+EXAMPLES
+
+    jSync
+        Launch the direction picker and transfer files interactively.
+
+KEYWORDS
+
+    sync, rsync, server, upload, download, transfer, copy, files, push, pull

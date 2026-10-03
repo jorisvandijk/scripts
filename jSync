@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+#	jSync 3.0
+#	Interactively sync files to or from a server via rsync
+#	Dependencies: fzf, rsync, ssh
+#	Keywords: sync, rsync, server, upload, download, transfer, copy, files, push, pull
+#	Usage: jSync
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jSync" && exit 0
+[[ -n "$1" ]]                             && j::die "Usage: jSync (no arguments)"
+
+j::require fzf rsync ssh
+
+SERVER_HOST="joris@192.168.1.5"
+SERVER_ROOT="/data"
+
+_list_server_dirs() {
+    ssh "$SERVER_HOST" "find '${SERVER_ROOT}' -maxdepth 1 -mindepth 1 -type d -printf '%f\n' | sort" 2>/dev/null
+}
+
+_do_push() {
+    local server_dir="$1"; shift
+    local items=("$@")
+    local sources=()
+    for item in "${items[@]}"; do
+        sources+=("${PWD}/${item}")
+    done
+    j::info "Pushing ${#sources[@]} item(s) to ${SERVER_HOST}:${SERVER_ROOT}/${server_dir}/"
+    rsync -avh --info=progress2 --partial "${sources[@]}" "${SERVER_HOST}:${SERVER_ROOT}/${server_dir}/"
+}
+
+_do_pull() {
+    local server_dir="$1"; shift
+    local items=("$@")
+    local sources=()
+    for item in "${items[@]}"; do
+        sources+=("${SERVER_HOST}:${SERVER_ROOT}/${server_dir}/${item}")
+    done
+    j::info "Pulling ${#items[@]} item(s) to ${PWD}/"
+    rsync -avh --info=progress2 --partial "${sources[@]}" "${PWD}/"
+}
+
+_flow_push() {
+    local selected_items=() server_dir server_dirs
+
+    server_dirs=$(_list_server_dirs)
+    [[ -z "$server_dirs" ]] && j::die "Cannot connect to ${SERVER_HOST} or no directories in ${SERVER_ROOT}"
+
+    while true; do
+        mapfile -t selected_items < <(
+            find . -maxdepth 1 -mindepth 1 | sed 's|^\./||' | sort | fzf \
+                -m \
+                --prompt="Local » " \
+                --height=60% \
+                --reverse \
+                --header="Select files to push  (TAB to multi-select, ENTER to confirm)"
+        )
+        [[ ${#selected_items[@]} -eq 0 ]] && return 1
+
+        server_dir=$(printf '%s\n' "$server_dirs" | fzf \
+            --prompt="Server dir » " \
+            --height=60% \
+            --reverse \
+            --no-multi \
+            --header="Select destination  (ESC to go back)")
+        [[ -n "$server_dir" ]] && break
+    done
+
+    _do_push "$server_dir" "${selected_items[@]}"
+}
+
+_flow_pull() {
+    local server_dir server_items server_dirs selected_items=()
+
+    server_dirs=$(_list_server_dirs)
+    [[ -z "$server_dirs" ]] && j::die "Cannot connect to ${SERVER_HOST} or no directories in ${SERVER_ROOT}"
+
+    while true; do
+        server_dir=$(printf '%s\n' "$server_dirs" | fzf \
+            --prompt="Server dir » " \
+            --height=60% \
+            --reverse \
+            --no-multi \
+            --header="Select source directory  (ESC to exit)")
+        [[ -z "$server_dir" ]] && return 1
+
+        server_items=$(ssh "$SERVER_HOST" "ls -1 --color=never '${SERVER_ROOT}/${server_dir}'" 2>/dev/null)
+        [[ -z "$server_items" ]] && { j::warn "${server_dir} is empty"; continue; }
+
+        mapfile -t selected_items < <(
+            printf '%s\n' "$server_items" | fzf \
+                -m \
+                --prompt="Files » " \
+                --height=60% \
+                --reverse \
+                --header="Select files to pull  (TAB to multi-select, ESC to go back)"
+        )
+        [[ ${#selected_items[@]} -gt 0 ]] && break
+    done
+
+    _do_pull "$server_dir" "${selected_items[@]}"
+}
+
+DIRECTION=$(printf 'push\npull\n' | fzf \
+    --prompt="jSync » " \
+    --height=20% \
+    --reverse \
+    --no-multi)
+[[ -z "$DIRECTION" ]] && exit 0
+
+case "$DIRECTION" in
+    push) _flow_push || exit 0 ;;
+    pull) _flow_pull || exit 0 ;;
+esac

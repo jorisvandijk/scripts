@@ -226,6 +226,7 @@ Add every new script to the `## Scripts` table below.
 | `jPush` | Stage, commit, and push to Git |
 | `jRename` | Rename files in current directory: lowercase, spaces and underscores to hyphens |
 | `jRepos` | Show git status of all repositories in ~/git |
+| `jSync` | Interactively sync files to or from a server via rsync |
 | `jTidy` | Audit the macOS home directory and guide an interactive cleanup |
 | `jTube` | Resolve YouTube channel IDs and output Nix RSS feed entries |
 
