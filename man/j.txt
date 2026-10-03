@@ -22,8 +22,37 @@ Every j-script sources j at startup. The library provides the logging
 helpers (j::info, j::warn, j::error, j::die), plain output (j::msg),
 inline prompts (j::prompt), y/n confirmation (j::confirm), version
 printing, man page display, dependency checking (j::require), OS
-detection (j::os), and the editor/discard flow (j::edit_or_discard).
+detection (j::os), the editor/discard flow (j::edit_or_discard), and
+three fzf picker helpers (j::pick, j::pick_table, j::pick_files).
 Run directly, j acts as a small CLI for managing the collection.
+
+FZF PICKERS
+
+All three helpers share a common house style defined in J_FZF_STYLE.
+The input label is set automatically to " jSuite · <script-name> ".
+
+    j::pick "prompt" single|multi
+        Plain line picker. Reads lines from stdin. The second argument
+        must be the literal word "single" or "multi".
+
+        Example:
+            printf 'foo\nbar\nbaz\n' | j::pick "Choose" single
+
+    j::pick_table "prompt" "col_spec" single|multi ["preview_cmd"]
+        Tab-delimited table picker. col_spec is a --with-nth spec
+        (e.g. "1,2" or "1,2,3") controlling which columns are
+        displayed. An optional fourth argument enables a preview pane.
+
+        Example:
+            printf 'id\tLabel\tMeta\n' | j::pick_table "Item" "1,2" single
+
+    j::pick_files ["prompt"]
+        Multi-select file picker with bat preview. Searches from the
+        current directory. Prompt defaults to "Files".
+
+        Example:
+            mapfile -t FILES < <(j::pick_files "Open")
+            micro "${FILES[@]}"
 
 Running j with no arguments opens an fzf picker listing all j-scripts with
 their descriptions. Typing any word searches by name, description, and

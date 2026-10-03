@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jLxc 3.0
+#	jLxc 3.1
 #	Toggle Proxmox LXC containers on/off
 #	Dependencies: fzf, ssh
 #	Keywords: lxc, container, proxmox, vm, toggle, start, stop
@@ -39,16 +39,7 @@ _build_fzf_input() {
 
 _pick_container() {
 	local input="$1"
-	fzf \
-		--ansi \
-		--delimiter=$'\t' \
-		--with-nth=1,2,3 \
-		--prompt="LXC » " \
-		--height=60% \
-		--reverse \
-		--border \
-		--header="  STATUS       NAME                            VMID" \
-		<<< "$input"
+	j::pick_table "Container" "1,2,3" single <<< "$input"
 }
 
 _toggle_container() {
@@ -72,7 +63,7 @@ _toggle_container() {
 	esac
 }
 
-j::require fzf ssh
+j::require ssh
 
 RAW=$(_fetch_containers)
 [[ -z "$RAW" ]] && j::die "Failed to connect to ${PROXMOX_HOST}"

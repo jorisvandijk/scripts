@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jGog 3.3
+#	jGog 3.4
 #	Browse GOG library and download games locally or to homelab
 #	Dependencies: lgogdownloader, fzf, ssh
 #	Keywords: gog, download, games, library, backup, installer, homelab
@@ -47,14 +47,7 @@ _format_library() {
 
 _pick_game() {
     local formatted="$1"
-    printf '%s\n' "$formatted" | fzf \
-        --no-multi \
-        --delimiter=$'\t' \
-        --with-nth=1 \
-        --prompt="GOG » " \
-        --height=90% \
-        --reverse \
-        --header="Select a game  (ENTER to confirm, ESC to exit)"
+    printf '%s\n' "$formatted" | j::pick_table "Game" "1" single
 }
 
 _fetch_game_files() {
@@ -126,14 +119,7 @@ _build_file_menu() {
 
 _pick_downloads() {
     local game_title="$1" menu="$2"
-    printf '%s\n' "$menu" | fzf \
-        -m \
-        --delimiter=$'\t' \
-        --with-nth=1 \
-        --prompt="Download » " \
-        --height=90% \
-        --reverse \
-        --header="Downloads for: ${game_title}  (TAB to multi-select, ENTER to confirm)"
+    printf '%s\n' "$menu" | j::pick_table "Download" "1" multi
 }
 
 _run_installer() {
@@ -181,7 +167,7 @@ _check_homelab() {
 USE_HOMELAB=false
 [[ "$1" == "--homelab" ]] && USE_HOMELAB=true
 
-j::require lgogdownloader fzf
+j::require lgogdownloader
 [[ "$USE_HOMELAB" == true ]] && j::require ssh
 
 _ensure_login

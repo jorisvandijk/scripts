@@ -130,8 +130,13 @@ Add a no-argument guard if the script takes no arguments:
 | `j::msg "msg"` | Print message to stdout with no prefix |
 | `j::prompt "text"` | Print bold inline prompt to stdout, no trailing newline |
 | `j::confirm "question" Y\|N` | Prompt for y/n, reprompt on invalid input, return 0 if confirmed. Second argument sets the default and must be `Y` or `N` |
+| `j::pick "prompt" single\|multi` | Interactive line picker (fzf). Reads from stdin. |
+| `j::pick_table "prompt" "col_spec" single\|multi ["preview_cmd"]` | Tab-delimited table picker. `col_spec` is a `--with-nth` spec e.g. `"1,2"`. Optional fourth arg enables a right-side preview pane. |
+| `j::pick_files ["prompt"]` | Multi-select file picker with bat preview. Prompt defaults to `Files`. |
 
-Colors available directly in any script: `$J_RED`, `$J_GREEN`, `$J_YELLOW`, `$J_RESET`, `$J_BOLD`, `$J_DIM`, `$J_CYAN`.
+All three pickers share a common house style (`J_FZF_STYLE`) defined in `j`. The input label is set automatically to `jSuite · <script-name>`. Pass a bare word as the prompt — the helper appends the colon.
+
+Colors available directly in any script: `$J_RED`, `$J_GREEN`, `$J_YELLOW`, `$J_PURPLE`, `$J_RESET`, `$J_BOLD`, `$J_DIM`, `$J_CYAN`.
 
 ### Code style
 
@@ -213,7 +218,7 @@ Add every new script to the `## Scripts` table below.
 |---|---|
 | `j` | j-scripts shared library and CLI tooling |
 | `jBlog` | Write and publish a Hugo blog post |
-| `jEject` | Eject a mounted drive via fzf |
+| `jEject` | Eject a mounted drive |
 | `jFindApp` | Search for an app across App Store, Homebrew, and Nix |
 | `jExtract` | Smart archive extraction |
 | `jFlac2Alac` | Batch-convert FLAC files to Apple Lossless (ALAC) |
@@ -223,7 +228,7 @@ Add every new script to the `## Scripts` table below.
 | `jList` | Directory listing with eza |
 | `jLxc` | Toggle Proxmox LXC containers on/off |
 | `jNewRepo` | Initialize a local git repo and create it on GitHub, GitLab, Codeberg, and Bitbucket |
-| `jOpenFzf` | Select files with fzf and open them in micro |
+| `jOpenFzf` | Select files with bat preview and open in micro |
 | `jPush` | Stage, commit, and push to Git |
 | `jRename` | Rename files in current directory: lowercase, spaces and underscores to hyphens |
 | `jRepos` | Show git status of all repositories in ~/git |

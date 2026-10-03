@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jSync 3.0
+#	jSync 3.1
 #	Interactively sync files to or from a server via rsync
 #	Dependencies: fzf, rsync, ssh
 #	Keywords: sync, rsync, server, upload, download, transfer, copy, files, push, pull
@@ -14,7 +14,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 [[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jSync" && exit 0
 [[ -n "$1" ]]                             && j::die "Usage: jSync (no arguments)"
 
-j::require fzf rsync ssh
+j::require rsync ssh
 
 SERVER_HOST="joris@192.168.1.5"
 SERVER_ROOT="/data"
@@ -53,21 +53,11 @@ _flow_push() {
 
     while true; do
         mapfile -t selected_items < <(
-            find . -maxdepth 1 -mindepth 1 | sed 's|^\./||' | sort | fzf \
-                -m \
-                --prompt="Local » " \
-                --height=60% \
-                --reverse \
-                --header="Select files to push  (TAB to multi-select, ENTER to confirm)"
+            find . -maxdepth 1 -mindepth 1 | sed 's|^\./||' | sort | j::pick "Local" multi
         )
         [[ ${#selected_items[@]} -eq 0 ]] && return 1
 
-        server_dir=$(printf '%s\n' "$server_dirs" | fzf \
-            --prompt="Server dir » " \
-            --height=60% \
-            --reverse \
-            --no-multi \
-            --header="Select destination  (ESC to go back)")
+        server_dir=$(printf '%s\n' "$server_dirs" | j::pick "Server dir" single)
         [[ -n "$server_dir" ]] && break
     done
 
@@ -81,24 +71,14 @@ _flow_pull() {
     [[ -z "$server_dirs" ]] && j::die "Cannot connect to ${SERVER_HOST} or no directories in ${SERVER_ROOT}"
 
     while true; do
-        server_dir=$(printf '%s\n' "$server_dirs" | fzf \
-            --prompt="Server dir » " \
-            --height=60% \
-            --reverse \
-            --no-multi \
-            --header="Select source directory  (ESC to exit)")
+        server_dir=$(printf '%s\n' "$server_dirs" | j::pick "Server dir" single)
         [[ -z "$server_dir" ]] && return 1
 
         server_items=$(ssh "$SERVER_HOST" "ls -1 --color=never '${SERVER_ROOT}/${server_dir}'" 2>/dev/null)
         [[ -z "$server_items" ]] && { j::warn "${server_dir} is empty"; continue; }
 
         mapfile -t selected_items < <(
-            printf '%s\n' "$server_items" | fzf \
-                -m \
-                --prompt="Files » " \
-                --height=60% \
-                --reverse \
-                --header="Select files to pull  (TAB to multi-select, ESC to go back)"
+            printf '%s\n' "$server_items" | j::pick "Files" multi
         )
         [[ ${#selected_items[@]} -gt 0 ]] && break
     done
@@ -106,11 +86,7 @@ _flow_pull() {
     _do_pull "$server_dir" "${selected_items[@]}"
 }
 
-DIRECTION=$(printf 'push\npull\n' | fzf \
-    --prompt="jSync » " \
-    --height=20% \
-    --reverse \
-    --no-multi)
+DIRECTION=$(printf 'push\npull\n' | j::pick "Direction" single)
 [[ -z "$DIRECTION" ]] && exit 0
 
 case "$DIRECTION" in

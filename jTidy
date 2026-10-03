@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jTidy 3.0
+#	jTidy 3.1
 #	Audit the macOS home directory and guide an interactive cleanup
 #	Dependencies: fzf, brew, du, df, find
 #	Keywords: cleanup, organize, home directory, dotfiles, audit, declutter
@@ -16,7 +16,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 
 [[ "$(j::os)" == "macos" ]] || j::die "This script only supports macOS"
 
-j::require fzf brew du df find
+j::require brew du df find
 
 # ---- Size helpers ----
 _avail_bytes() { df -k / | awk 'NR==2 {print $4 * 1024}'; }
@@ -34,15 +34,9 @@ _bytes_hr() {
 
 # ---- fzf selection over tab-delimited "size\tpath" lines ----
 _fzf_pick() {
-    local prompt="$1" header="$2"
-    fzf --multi \
-        --height=80% --border --reverse \
-        --delimiter=$'\t' \
-        --with-nth=1,2 \
-        --preview 'target={2}; if [[ -d "$target" ]]; then ls -lah "$target" 2>/dev/null | head -30; else file "$target" 2>/dev/null; fi' \
-        --preview-window=right:55%:wrap \
-        --prompt="$prompt> " \
-        --header="$header"
+    local prompt="$1"
+    j::pick_table "$prompt" "1,2" multi \
+        'target={2}; if [[ -d "$target" ]]; then ls -lah "$target" 2>/dev/null | head -30; else file "$target" 2>/dev/null; fi'
 }
 
 # ---- Deleters: consume tab-delimited "size\tpath" lines on stdin ----
@@ -227,7 +221,7 @@ _phase_caches() {
     j::msg "${J_DIM}TAB to mark, ENTER to confirm, ESC to skip.${J_RESET}"
     local selected
     selected=$(du -sh ~/Library/Caches/* 2>/dev/null | sort -hr | head -20 |
-        _fzf_pick "cache" "Select cache dirs to remove")
+        _fzf_pick "Cache")
     _review_and_delete "$selected" "Delete these?"
 }
 
@@ -242,7 +236,7 @@ _phase_app_support() {
             du -sh ~/Library/Application\ Support/* 2>/dev/null | sort -hr | head -15
             du -sh ~/Library/Containers/*           2>/dev/null | sort -hr | head -10
         } | sort -hr |
-        _fzf_pick "big" "Select items to REMOVE (be careful)"
+        _fzf_pick "App Support"
     )
     _review_and_delete "$selected" "${J_RED}REALLY delete these?${J_RESET}"
 }
@@ -256,7 +250,7 @@ _phase_orphan_configs() {
         size=$(du -sh "$dir" 2>/dev/null | awk '{print $1}')
         orphan_list+="${size}"$'\t'"${dir}"$'\n'
     done
-    selected=$(printf '%s' "$orphan_list" | _fzf_pick "orphan" "Select orphan configs to remove")
+    selected=$(printf '%s' "$orphan_list" | _fzf_pick "Orphans")
     _review_and_delete "$selected" "Delete these?" _delete_orphan_config
 }
 
@@ -265,10 +259,7 @@ _phase_snapshots() {
     j::msg ""; j::msg "${J_BOLD}${J_CYAN}━━━ PHASE 6 — Time Machine local snapshots ━━━${J_RESET}"
     j::warn "Deletion requires sudo."
     local selected
-    selected=$(printf '%s\n' "${SNAPSHOT_NAMES[@]}" |
-        fzf --multi --height=60% --border --reverse \
-            --prompt="snap> " \
-            --header="Select snapshots to delete (TAB, ENTER)")
+    selected=$(printf '%s\n' "${SNAPSHOT_NAMES[@]}" | j::pick "Snapshots" multi)
     [[ -n "$selected" ]] || { j::msg "${J_DIM}Skipped.${J_RESET}"; return; }
     j::confirm "Delete selected snapshots (sudo)?" N || return
     printf '%s\n' "$selected" | _delete_snapshots

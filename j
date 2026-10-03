@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	j 3.0
+#	j 3.1
 #	j-scripts shared library and CLI tooling
 #	Dependencies: none
 #	Keywords: library, cli, help, list, new, man
@@ -8,16 +8,29 @@
 #	By Joris van Dijk | Jorisvandijk.com
 #	Licensed under the MIT license
 
-J_RED='' J_GREEN='' J_YELLOW='' J_RESET='' J_BOLD='' J_DIM='' J_CYAN=''
+J_RED='' J_GREEN='' J_YELLOW='' J_RESET='' J_BOLD='' J_DIM='' J_CYAN='' J_PURPLE=''
 [[ -t 1 && -z "${NO_COLOR:-}" ]] && {
     J_RED=$'\033[0;31m'
     J_GREEN=$'\033[0;32m'
     J_YELLOW=$'\033[0;33m'
+    J_PURPLE=$'\033[0;35m'
     J_RESET=$'\033[0m'
     J_BOLD=$'\033[1m'
     J_DIM=$'\033[2m'
     J_CYAN=$'\033[36m'
 }
+
+J_FZF_STYLE=(
+    --style=full:rounded
+    --color='prompt:-1,pointer:green,marker:yellow,hl:green,hl+:green,input-label:magenta:bold'
+    --reverse
+    --height=100%
+    --info=inline-right
+    --no-bold
+    --no-hscroll
+    --tabstop=14
+    --padding=0,0,0,0
+)
 
 _j_cap() { local text="$*"; printf '%s' "${text^}"; }
 
@@ -73,6 +86,37 @@ j::version() {
     sed -n '2s/^#\t*//p' "$script"
 }
 
+j::pick() {
+    local prompt="$1" mode="$2"
+    j::require fzf
+    local multi=""; [[ "$mode" == "multi" ]] && multi="-m"
+    fzf $multi "${J_FZF_STYLE[@]}" \
+        --prompt="$prompt: " \
+        --input-label=" jSuite · $(basename "$0") "
+}
+
+j::pick_table() {
+    local prompt="$1" col_spec="$2" mode="$3" preview="${4:-}"
+    j::require fzf
+    local multi=""; [[ "$mode" == "multi" ]] && multi="-m"
+    local args=($multi --ansi --delimiter=$'\t' --with-nth="$col_spec"
+                --prompt="$prompt: "
+                --input-label=" jSuite · $(basename "$0") "
+                "${J_FZF_STYLE[@]}")
+    [[ -n "$preview" ]] && args+=(--preview="$preview" --preview-window=right:50%:wrap)
+    fzf "${args[@]}"
+}
+
+j::pick_files() {
+    local prompt="${1:-Files}"
+    j::require fzf bat
+    fzf -m "${J_FZF_STYLE[@]}" \
+        --prompt="$prompt: " \
+        --input-label=" jSuite · $(basename "$0") " \
+        --preview="bat --color=always {}" \
+        --preview-window=right:55%:wrap
+}
+
 j::show_man() {
     local name="$1"
     local script_dir; script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -126,16 +170,9 @@ _j_launch() {
 
     local selection
     selection=$(
-        _j_entries "$script_dir" | fzf \
-            --delimiter=$'\t' \
-            --with-nth=1,2 \
-            --tabstop=14 \
-            --no-multi \
-            --prompt='j> ' \
-            --height=80% \
-            --reverse \
-            --preview="cat ${script_dir}/man/{1}.txt 2>/dev/null || printf 'No man page available.'" \
-            --preview-window=right:50%:wrap
+        _j_entries "$script_dir" | j::pick_table \
+            'Pick a script' '1,2' single \
+            "cat ${script_dir}/man/{1}.txt 2>/dev/null || printf 'No man page available.'"
     )
     [[ -z "$selection" ]] && return 0
     printf '%s ' "${selection%%$'\t'*}"
