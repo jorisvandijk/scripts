@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	j 3.6
+#	j 3.7
 #	j-scripts shared library and CLI tooling
 #	Dependencies: none
 #	Keywords: library, cli, help, list, new, man
@@ -48,10 +48,10 @@ j::require() {
 }
 
 j::os() {
-    case "$(uname)" in
-        Darwin) echo "macos" ;;
-        Linux)  echo "linux" ;;
-        *)      j::die "Unsupported OS: $(uname)" ;;
+    case "$OSTYPE" in
+        darwin*) echo "macos" ;;
+        linux*)  echo "linux" ;;
+        *)       j::die "Unsupported OS: $OSTYPE" ;;
     esac
 }
 
@@ -91,8 +91,9 @@ j::version() {
 j::pick() {
     local prompt="$1" mode="$2"
     j::require fzf
-    local multi=""; [[ "$mode" == "multi" ]] && multi="-m"
-    fzf $multi "${J_FZF_STYLE[@]}" \
+    local multi_flag=()
+    [[ "$mode" == "multi" ]] && multi_flag=(-m)
+    fzf "${multi_flag[@]}" "${J_FZF_STYLE[@]}" \
         --prompt="$prompt: " \
         --input-label=" jSuite · ${0##*/} "
 }
@@ -100,8 +101,9 @@ j::pick() {
 j::pick_table() {
     local prompt="$1" col_spec="$2" mode="$3" preview="${4:-}"
     j::require fzf
-    local multi=""; [[ "$mode" == "multi" ]] && multi="-m"
-    local args=($multi --ansi --delimiter=$'\t' --with-nth="$col_spec"
+    local multi_flag=()
+    [[ "$mode" == "multi" ]] && multi_flag=(-m)
+    local args=("${multi_flag[@]}" --ansi --delimiter=$'\t' --with-nth="$col_spec"
                 --prompt="$prompt: "
                 --input-label=" jSuite · ${0##*/} "
                 "${J_FZF_STYLE[@]}")
@@ -151,6 +153,12 @@ _j_script_dir() {
     cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P
 }
 
+_j_read_desc() {
+    local script="$1" lines
+    mapfile -n 3 -t lines < "$script"
+    printf '%s' "${lines[2]#$'#\t'}"
+}
+
 _j_read_keywords() {
     local man_file="$1"
     [[ -f "$man_file" ]] || return 0
@@ -170,8 +178,7 @@ _j_list() {
         [[ -f "$script" && -x "$script" ]] || continue
         name="${script##*/}"
         [[ "$name" != "j" && ! "$name" =~ ^j[A-Z][a-zA-Z0-9]*$ ]] && continue
-        local lines; mapfile -n 3 -t lines < "$script"
-        desc="${lines[2]#$'#\t'}"
+        desc="$(_j_read_desc "$script")"
         printf '%-22s - %s\n' "$name" "${desc:-(no description)}"
     done
 }
@@ -183,11 +190,10 @@ _j_entries() {
         [[ -f "$script" && -x "$script" ]] || continue
         name="${script##*/}"
         [[ "$name" == "j" || ! "$name" =~ ^j[A-Z][a-zA-Z0-9]*$ ]] && continue
-        local lines; mapfile -n 3 -t lines < "$script"
-        desc="${lines[2]#$'#\t'}"
+        desc="$(_j_read_desc "$script")"
         keywords="$(_j_read_keywords "${script_dir}/man/${name}.txt")"
         kw_display=""
-        [[ -n "$keywords" ]] && kw_display=$'  \033[2m'"${keywords}"$'\033[0m'
+        [[ -n "$keywords" ]] && kw_display=$'  \033[2m'"${keywords}"$'\033[0m'  # J_DIM unavailable: stdout captured by j.zsh
         printf '%s\t%s%s\n' "$name" "${desc:-(no description)}" "$kw_display"
     done
 }
