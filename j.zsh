@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 #	j.zsh 1.0
-#	Zsh shell integration for j-scripts
+#	Zsh shell integration for jScripts
 #	Source this file from ~/.zshrc: source ~/git/scripts/j.zsh
 
 j() {

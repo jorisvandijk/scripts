@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #	j 3.8
-#	j-scripts shared library and CLI tooling
+#	jScripts shared library and CLI tooling
 #	Dependencies: none
 #	Keywords: library, cli, help, list, new, man
 #	Usage: j <command> [args]
@@ -8,6 +8,7 @@
 #	By Joris van Dijk | Jorisvandijk.com
 #	Licensed under the MIT license
 
+J_SUITE="jScripts"
 J_RED='' J_GREEN='' J_YELLOW='' J_RESET='' J_BOLD='' J_DIM='' J_CYAN='' J_PURPLE=''
 [[ -t 1 && -z "${NO_COLOR:-}" ]] && {
     J_RED=$'\033[0;31m'
@@ -95,7 +96,7 @@ j::pick() {
     [[ "$mode" == "multi" ]] && multi_flag=(-m)
     fzf "${multi_flag[@]}" "${J_FZF_STYLE[@]}" \
         --prompt="$prompt: " \
-        --input-label=" jSuite · ${0##*/} "
+        --input-label=" ${J_SUITE} · ${0##*/} "
 }
 
 j::pick_table() {
@@ -105,7 +106,7 @@ j::pick_table() {
     [[ "$mode" == "multi" ]] && multi_flag=(-m)
     local args=("${multi_flag[@]}" --ansi --delimiter=$'\t' --with-nth="$col_spec"
                 --prompt="$prompt: "
-                --input-label=" jSuite · ${0##*/} "
+                --input-label=" ${J_SUITE} · ${0##*/} "
                 "${J_FZF_STYLE[@]}")
     [[ -n "$preview" ]] && args+=(--preview="$preview" --preview-window=right:50%:wrap)
     fzf "${args[@]}"
@@ -116,7 +117,7 @@ j::pick_files() {
     j::require fzf bat
     fzf -m "${J_FZF_STYLE[@]}" \
         --prompt="$prompt: " \
-        --input-label=" jSuite · ${0##*/} " \
+        --input-label=" ${J_SUITE} · ${0##*/} " \
         --preview="bat --color=always {}" \
         --preview-window=right:55%:wrap
 }
@@ -278,11 +279,11 @@ _j_newman() {
 
 _j_usage() {
     cat << 'EOF'
-j - j-scripts shared library and CLI tooling
+j - jScripts shared library and CLI tooling
 
 Usage:
   j                    Launch the interactive script picker
-  j list               List all j-scripts with descriptions
+  j list               List all jScripts with descriptions
   j new <jName>        Create a new script (must run from scripts directory)
   j man <jName>        Show the man page for a script
   j newman <jName>     Create a new man page stub

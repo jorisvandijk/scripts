@@ -1,12 +1,12 @@
 NAME
-    j - j-scripts shared library and CLI tooling
+    j - jScripts shared library and CLI tooling
 
 SYNOPSIS
     j [command] [args]
 
     Commands:
       (none)            Open the interactive script picker (requires fzf)
-      list              List all available j-scripts with descriptions
+      list              List all available jScripts with descriptions
       new <jName>       Create a new script from the standard template
       man <jName>       Open the man page for a script in $PAGER
       newman <jName>    Create a new man page stub for a script
@@ -29,7 +29,7 @@ Run directly, j acts as a small CLI for managing the collection.
 FZF PICKERS
 
 All three helpers share a common house style defined in J_FZF_STYLE.
-The input label is set automatically to " jSuite · <script-name> ".
+The input label is set automatically to " jScripts · <script-name> ".
 
     j::pick "prompt" single|multi
         Plain line picker. Reads lines from stdin. The second argument
@@ -54,7 +54,7 @@ The input label is set automatically to " jSuite · <script-name> ".
             mapfile -t FILES < <(j::pick_files "Open")
             micro "${FILES[@]}"
 
-Running j with no arguments opens an fzf picker listing all j-scripts with
+Running j with no arguments opens an fzf picker listing all jScripts with
 their descriptions. Typing any word searches by name, description, and
 keywords. The full man page is shown in the right preview pane. Pressing
 Enter outputs the selected script name with a trailing space. To get the
@@ -77,7 +77,7 @@ EXAMPLES
         Open the interactive script picker.
 
     j list
-        Print all j-scripts with their one-line descriptions.
+        Print all jScripts with their one-line descriptions.
 
     j help
         Print the command list.
