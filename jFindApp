@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jFindApp 3.1
+#	jFindApp 3.2
 #	Search for an app across App Store, Homebrew, and Nix
 #	Dependencies: mas, brew, nix
 #	Keywords: install, search, find, application, app store, homebrew, software
@@ -14,7 +14,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 [[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jFindApp" && exit 0
 [[ -z "$1" ]] && j::die "Usage: jFindApp <name>"
 
-j::require mas brew nix
+j::require mas brew nix awk grep head sed sort
 
 QUERY="$1"
 

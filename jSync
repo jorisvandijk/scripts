@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jSync 3.2
+#	jSync 3.3
 #	Interactively sync files to or from a server via rsync
 #	Dependencies: fzf, rsync, ssh
 #	Keywords: sync, rsync, server, upload, download, transfer, copy, files, push, pull
@@ -14,7 +14,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 [[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jSync" && exit 0
 [[ -n "$1" ]]                             && j::die "Usage: jSync (no arguments)"
 
-j::require rsync ssh
+j::require rsync ssh find sort
 
 SERVER_HOST="joris@192.168.1.5"
 SERVER_ROOT="/data"

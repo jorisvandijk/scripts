@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jGog 3.5
+#	jGog 3.6
 #	Browse GOG library and download games locally or to homelab
 #	Dependencies: lgogdownloader, fzf, ssh
 #	Keywords: gog, download, games, library, backup, installer, homelab
@@ -163,8 +163,8 @@ _check_homelab() {
 USE_HOMELAB=false
 [[ "$1" == "--homelab" ]] && USE_HOMELAB=true
 
-j::require lgogdownloader
-[[ "$USE_HOMELAB" == true ]] && j::require ssh
+j::require lgogdownloader grep head
+[[ "$USE_HOMELAB" == true ]] && j::require ssh scp
 
 _ensure_login
 

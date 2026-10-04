@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jRename 3.1
+#	jRename 3.2
 #	Rename files in current directory: lowercase, spaces and underscores to hyphens
 #	Dependencies: none
 #	Keywords: rename, lowercase, label, new name, hyphen, underscore
@@ -13,6 +13,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 [[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
 [[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jRename" && exit 0
 [[ -n "$1" ]]                             && j::die "Usage: jRename (no arguments)"
+
+j::require mv
 
 _process_files() {
     local file lowercased candidate

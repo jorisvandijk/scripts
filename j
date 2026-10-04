@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	j 3.7
+#	j 3.8
 #	j-scripts shared library and CLI tooling
 #	Dependencies: none
 #	Keywords: library, cli, help, list, new, man
@@ -126,6 +126,7 @@ j::show_man() {
     local script_dir; script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
     local man_file="${script_dir}/man/${name}.txt"
     [[ ! -f "$man_file" ]] && j::die "No man page for ${name}"
+    j::require "${PAGER:-less}"
     ${PAGER:-less} "$man_file"
 }
 

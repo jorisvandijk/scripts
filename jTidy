@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jTidy 3.4
+#	jTidy 3.5
 #	Audit the macOS home directory and guide an interactive cleanup
 #	Dependencies: fzf, brew
 #	Keywords: cleanup, organize, home directory, dotfiles, audit, declutter
@@ -16,7 +16,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 
 [[ "$(j::os)" == "macos" ]] || j::die "This script only supports macOS"
 
-j::require brew du df find
+j::require brew du df find awk grep head ls rm sed sort sudo tmutil
 
 _avail_bytes() { df -k / | awk 'NR==2 {print $4 * 1024}'; }
 _home_bytes()  { du -sk ~ 2>/dev/null | awk '{print $1 * 1024}'; }

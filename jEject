@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jEject 3.2
+#	jEject 3.3
 #	Eject a mounted drive
 #	Dependencies: fzf, diskutil (macOS), lsblk, udisksctl or eject (Linux)
 #	Keywords: unmount, usb, drive, disk, volume, safely remove
@@ -15,7 +15,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 [[ -n "$1" ]]                             && j::die "Usage: jEject (no arguments)"
 
 _list_drives_macos() {
-    j::require diskutil
+    j::require diskutil awk
     diskutil list external | awk '
         /^\/dev\// { dev=$1; next }
         /^[[:space:]]+0:/ { print dev, $3, $4 }
@@ -23,7 +23,7 @@ _list_drives_macos() {
 }
 
 _list_drives_linux() {
-    j::require lsblk
+    j::require lsblk awk
     lsblk -d -n -o NAME,SIZE,LABEL,RM | awk '$4 == "1" {
         label = ($3 == "" ? "(no label)" : $3)
         print "/dev/"$1, $2, label

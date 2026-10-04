@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jBlog 3.5
+#	jBlog 3.6
 #	Write and publish a Hugo blog post
 #	Dependencies: hugo, zeditor, git, fzf, curl, lsof
 #	Keywords: write, post, article, hugo, publish, draft, blog
@@ -21,7 +21,7 @@ DEST=""
 DRAFT_FILE=""
 
 _preflight() {
-    j::require hugo git zeditor
+    j::require hugo git zeditor basename curl grep lsof mktemp mv open rm sed sleep sort tr
     cd "$WEBSITE_DIR" || j::die "Could not cd to $WEBSITE_DIR"
 }
 
@@ -126,7 +126,7 @@ _existing_tags() {
 _pick_tags() {
     local existing="$1"
     [[ -z "$existing" ]] && return 0
-    echo "$existing" | j::pick "Tags" multi
+    printf '%s\n' "$existing" | j::pick "Tags" multi
 }
 
 _write_tags() {

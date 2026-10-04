@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jNewRepo 3.1
+#	jNewRepo 3.2
 #	Initialize a local git repo and create it on GitHub, GitLab, Codeberg, and Bitbucket
 #	Dependencies: git, curl
 #	Keywords: github, gitlab, codeberg, bitbucket, create, initialize, new repo
@@ -13,7 +13,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 [[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
 [[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jNewRepo" && exit 0
 
-j::require git curl
+j::require git curl grep head mktemp rm
 
 PRIVATE=false
 DESCRIPTION=""

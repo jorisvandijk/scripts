@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jTube 3.1
+#	jTube 3.2
 #	Resolve YouTube channel IDs and output Nix RSS feed entries
 #	Dependencies: curl
 #	Keywords: youtube, channel, id, rss, nix, feed, subscribe
@@ -14,7 +14,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 [[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jTube" && exit 0
 [[ -z "$1" ]]                             && j::die "Usage: jTube <url-or-handle> [...]"
 
-j::require curl
+j::require curl grep head mktemp rm sed
 
 _normalize_url() {
     local input="$1"
