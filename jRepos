@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jRepos 3.0
+#	jRepos 3.1
 #	Show git status of all repositories in ~/git
 #	Dependencies: git
 #	Keywords: git status, repositories, overview, dirty, branches
@@ -29,7 +29,7 @@ _count_states() {
         [[ "$work_status" == "M" ]]      && modified=$((modified + 1))
         [[ "$index_status$work_status" == "??" ]] && untracked=$((untracked + 1))
     done
-    echo "$conflicted|$staged|$modified|$untracked"
+    printf '%s\n' "$conflicted|$staged|$modified|$untracked"
 }
 
 _build_label() {
@@ -41,15 +41,15 @@ _build_label() {
     [[ "$untracked"  -gt 0 ]] && parts+=("$untracked untracked")
     [[ "$ahead"      -gt 0 ]] && parts+=("ahead $ahead")
     [[ "$behind"     -gt 0 ]] && parts+=("behind $behind")
-    echo "${parts[*]:-clean}"
+    printf '%s\n' "${parts[*]:-clean}"
 }
 
 _classify() {
     local conflicted="$1" staged="$2" modified="$3" untracked="$4" ahead="$5" behind="$6"
-    [[ "$conflicted" -gt 0 ]]                                        && echo "conflict" && return
-    [[ "$ahead" -gt 0 || "$behind" -gt 0 ]]                          && echo "sync"     && return
-    [[ "$staged" -gt 0 || "$modified" -gt 0 || "$untracked" -gt 0 ]] && echo "dirty"    && return
-    echo "clean"
+    [[ "$conflicted" -gt 0 ]]                                        && printf 'conflict\n' && return
+    [[ "$ahead" -gt 0 || "$behind" -gt 0 ]]                          && printf 'sync\n'     && return
+    [[ "$staged" -gt 0 || "$modified" -gt 0 || "$untracked" -gt 0 ]] && printf 'dirty\n'    && return
+    printf 'clean\n'
 }
 
 _print_group() {
