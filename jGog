@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jGog 3.4
+#	jGog 3.5
 #	Browse GOG library and download games locally or to homelab
 #	Dependencies: lgogdownloader, fzf, ssh
 #	Keywords: gog, download, games, library, backup, installer, homelab
@@ -32,7 +32,7 @@ _fetch_library() {
 _parse_library_line() {
     local line="$1" game_id display_title
     # Format: "game_id" or "game_id [N]"  (N = number of extras)
-    game_id="${line%% *}"           # strip " [N]" suffix (everything from first space)
+    game_id="${line%% *}"
     [[ -z "$game_id" ]] && return 1
     display_title="${game_id//_/ }"
     printf '%s\t%s\n' "$display_title" "$game_id"
