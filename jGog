@@ -34,7 +34,7 @@ _parse_library_line() {
     # Format: "game_id" or "game_id [N]"  (N = number of extras)
     game_id="${line%% *}"           # strip " [N]" suffix (everything from first space)
     [[ -z "$game_id" ]] && return 1
-    display_title="${game_id//_/ }" # underscores → spaces for readability
+    display_title="${game_id//_/ }"
     printf '%s\t%s\n' "$display_title" "$game_id"
 }
 
@@ -72,7 +72,6 @@ _build_file_menu() {
 
     mapfile -t files <<< "$file_list"
 
-    # Windows: .exe stubs grouped with their .bin parts
     for filename in "${files[@]}"; do
         [[ "$filename" != *.exe ]] && continue
         base="${filename%.exe}"
@@ -85,21 +84,18 @@ _build_file_menu() {
         grouped["$filename"]=1
     done
 
-    # macOS: .pkg installers
     for filename in "${files[@]}"; do
         [[ "$filename" != *.pkg ]] && continue
         printf '%s\t%s\t%s\n' "[macOS] ${filename%.pkg} (1 file)" "installer" "--platform m --include bi"
         grouped["$filename"]=1
     done
 
-    # Linux: .sh installers
     for filename in "${files[@]}"; do
         [[ "$filename" != *.sh ]] && continue
         printf '%s\t%s\t%s\n' "[Linux] ${filename%.sh} (1 file)" "installer" "--platform l --include bi"
         grouped["$filename"]=1
     done
 
-    # Extras: group all remaining files into one entry
     local -a extra_files=()
     for filename in "${files[@]}"; do
         [[ "${grouped[$filename]+_}" ]] && continue
