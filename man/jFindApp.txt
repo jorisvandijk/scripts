@@ -12,12 +12,14 @@ DESCRIPTION
 
 Searches for <name> in the Mac App Store (via mas), Homebrew (brew search),
 and Nix (nix search nixpkgs), and prints a one-line summary per store.
+Nix results are filtered to packages available on the current platform.
 Requires mas, brew, and nix to all be installed.
 
 Each result is color-coded: green for an exact match, yellow for close but
 not exact matches, red when nothing is found.
 
-Note: the first Nix search may be slow while the package index is fetched.
+Note: Nix searches may be slow. The first run fetches the package index;
+subsequent runs perform a platform-availability check per result.
 
 EXAMPLES
 

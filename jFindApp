@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jFindApp 3.2
+#	jFindApp 3.3
 #	Search for an app across App Store, Homebrew, and Nix
 #	Dependencies: mas, brew, nix
 #	Keywords: install, search, find, application, app store, homebrew, software
@@ -60,6 +60,21 @@ _search_homebrew() {
     _format_result "Homebrew" "$all_names"
 }
 
+_nix_is_supported() {
+    local name="$1"
+    local result
+    result=$(nix eval "nixpkgs#${name}.meta.unsupported" 2>/dev/null)
+    [[ "$result" != "true" ]]
+}
+
+_nix_filter_supported() {
+    local name
+    while IFS= read -r name; do
+        [[ -z "$name" ]] && continue
+        _nix_is_supported "$name" && printf '%s\n' "$name"
+    done
+}
+
 _search_nix() {
     local arch all_names
     local cpu="${MACHTYPE%%-*}"
@@ -68,6 +83,7 @@ _search_nix() {
         | sed 's/\x1b\[[0-9;]*m//g' \
         | grep "^\* legacyPackages\.${arch}\." \
         | awk '{n=$2; sub(/.*\./, "", n); print n}' \
+        | _nix_filter_supported \
         | sort -u)
     _format_result "Nix" "$all_names"
 }
