@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jRename 3.0
+#	jRename 3.1
 #	Rename files in current directory: lowercase, spaces and underscores to hyphens
 #	Dependencies: none
 #	Keywords: rename, lowercase, label, new name, hyphen, underscore
@@ -29,9 +29,7 @@ _process_files() {
         j::info "Renamed: '$file' → '$candidate'"
         changed=$(( changed + 1 ))
     done
-    if [[ $changed -eq 0 ]]; then
-        j::info "No files needed renaming"
-    fi
+    [[ $changed -eq 0 ]] && j::info "No files needed renaming"
 }
 
 _process_files
