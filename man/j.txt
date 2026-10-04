@@ -66,8 +66,8 @@ file from ~/.zshrc:
 With this in place, typing j and pressing Enter opens the picker;
 selecting a script places its name in the prompt ready for arguments.
 
-"j new" opens $EDITOR with a compliant template and only writes the file
-if it was changed. "j newman" works the same way for man page stubs.
+"j new" can be run from any directory and opens $EDITOR with a compliant
+template, only writing the file if it was changed. "j newman" works the same way for man page stubs.
 "j list" reads the description line from each script header at runtime,
 so there is no separate registry to keep in sync.
 

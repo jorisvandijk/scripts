@@ -218,7 +218,6 @@ _j_new() {
     local script_dir; script_dir="$(_j_script_dir)"
 
     [[ -z "$name" ]]                            && j::die "Usage: j new <jName>"
-    [[ "$(pwd -P)" != "$script_dir" ]]          && j::die "The program j must be run from ${script_dir}"
     [[ ! "$name" =~ ^j[A-Z][a-zA-Z0-9]*$ ]]     && j::die "Invalid name '${name}': must match ^j[A-Z][a-zA-Z0-9]*\$"
     [[ -f "${script_dir}/${name}" ]]            && j::die "Script '${name}' already exists"
 

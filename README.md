@@ -43,7 +43,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 ```
 j                    Open the interactive script picker (requires fzf)
 j list               List all scripts with their one-line descriptions
-j new <jName>        Create a new script (must cd to ~/git/scripts/ first)
+j new <jName>        Create a new script
 j man <jName>        Show the man page for a script
 j newman <jName>     Create a new man page stub for a script
 j help               Show the command list
@@ -54,7 +54,6 @@ j help               Show the command list
 ## Creating a new script
 
 ```bash
-cd ~/git/scripts
 j new jMyTool
 ```
 
