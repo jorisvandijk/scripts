@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-#	jBlog 3.4
+#	jBlog 3.5
 #	Write and publish a Hugo blog post
-#	Dependencies: hugo, zeditor, git, fzf
+#	Dependencies: hugo, zeditor, git, fzf, curl, lsof
 #	Keywords: write, post, article, hugo, publish, draft, blog
 #	Usage: jBlog
 #
@@ -30,7 +30,7 @@ _find_draft() {
     local drafts=("$WEBSITE_DIR/content/posts/untitled-"*.md)
     shopt -u nullglob
     [[ ${#drafts[@]} -gt 1 ]] && j::warn "Found ${#drafts[@]} drafts — using oldest; others may need cleanup"
-    [[ ${#drafts[@]} -gt 0 ]] && echo "${drafts[0]}"
+    [[ ${#drafts[@]} -gt 0 ]] && printf '%s\n' "${drafts[0]}"
 }
 
 _create_draft() {
@@ -78,7 +78,7 @@ _slugify() {
     local slug="${title,,}"
     slug="${slug// /-}"
     slug="${slug//[^a-z0-9-]/}"
-    echo "$slug"
+    printf '%s\n' "$slug"
 }
 
 _update_front_matter() {
@@ -117,6 +117,7 @@ _finish_post() {
 }
 
 _existing_tags() {
+    # no builtin alternative for sort -u dedup; sed handles multi-step YAML stripping
     grep -h "^tags:" "$WEBSITE_DIR/content/posts/"*.md 2>/dev/null \
         | sed 's/tags: \[//; s/\]//; s/"//g; s/ //g' \
         | tr ',' '\n' | sort -u | grep -v '^$'
@@ -129,8 +130,14 @@ _pick_tags() {
 }
 
 _write_tags() {
-    local tags_str="$1"
-    sed -i '' "s|^tags:.*|tags: [${tags_str}]|" "$DEST"
+    local tags_str="$1" tmp line
+    tmp="$(mktemp)"
+    while IFS= read -r line; do
+        case "$line" in
+            tags:*) printf 'tags: [%s]\n' "$tags_str" ;;
+            *)      printf '%s\n' "$line" ;;
+        esac
+    done < "$DEST" > "$tmp" && mv "$tmp" "$DEST"
     j::info "Tags: ${tags_str}"
 }
 
