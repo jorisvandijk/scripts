@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-#	jTidy 3.3
+#	jTidy 3.4
 #	Audit the macOS home directory and guide an interactive cleanup
-#	Dependencies: fzf, brew, du, df, find
+#	Dependencies: fzf, brew
 #	Keywords: cleanup, organize, home directory, dotfiles, audit, declutter
 #	Usage: jTidy
 #
