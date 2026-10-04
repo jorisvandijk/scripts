@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jHugoHelper 3.0
+#	jHugoHelper 3.1
 #	Hugo site helper: server, new post, new status
 #	Dependencies: hugo
 #	Keywords: hugo, website, server, static site, post, preview
@@ -32,8 +32,9 @@ _new_post() {
 
 _new_status() {
     _enter_website_dir
-    local timestamp; timestamp="$(date +%Y-%m-%d-%H%M%S)"
-    local filepath="content/microblog/${timestamp}.md"
+    local timestamp filepath
+    printf -v timestamp '%(%Y-%m-%d-%H%M%S)T' -1
+    filepath="content/microblog/${timestamp}.md"
     [[ -e "$filepath" ]] && j::die "Path already exists: ${filepath}"
     hugo new "microblog/${timestamp}.md" || j::die "Hugo could not create the status"
     j::edit_or_discard "$filepath" || { j::info "No changes - status discarded"; exit 0; }

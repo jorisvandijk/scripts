@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	j 3.5
+#	j 3.6
 #	j-scripts shared library and CLI tooling
 #	Dependencies: none
 #	Keywords: library, cli, help, list, new, man
@@ -94,7 +94,7 @@ j::pick() {
     local multi=""; [[ "$mode" == "multi" ]] && multi="-m"
     fzf $multi "${J_FZF_STYLE[@]}" \
         --prompt="$prompt: " \
-        --input-label=" jSuite · $(basename "$0") "
+        --input-label=" jSuite · ${0##*/} "
 }
 
 j::pick_table() {
@@ -103,7 +103,7 @@ j::pick_table() {
     local multi=""; [[ "$mode" == "multi" ]] && multi="-m"
     local args=($multi --ansi --delimiter=$'\t' --with-nth="$col_spec"
                 --prompt="$prompt: "
-                --input-label=" jSuite · $(basename "$0") "
+                --input-label=" jSuite · ${0##*/} "
                 "${J_FZF_STYLE[@]}")
     [[ -n "$preview" ]] && args+=(--preview="$preview" --preview-window=right:50%:wrap)
     fzf "${args[@]}"
@@ -114,7 +114,7 @@ j::pick_files() {
     j::require fzf bat
     fzf -m "${J_FZF_STYLE[@]}" \
         --prompt="$prompt: " \
-        --input-label=" jSuite · $(basename "$0") " \
+        --input-label=" jSuite · ${0##*/} " \
         --preview="bat --color=always {}" \
         --preview-window=right:55%:wrap
 }
@@ -215,11 +215,11 @@ _j_new() {
     [[ ! "$name" =~ ^j[A-Z][a-zA-Z0-9]*$ ]]     && j::die "Invalid name '${name}': must match ^j[A-Z][a-zA-Z0-9]*\$"
     [[ -f "${script_dir}/${name}" ]]            && j::die "Script '${name}' already exists"
 
-    local tmpfile; tmpfile="$(mktemp)"
+    local tmpfile template
+    tmpfile="$(mktemp)"
     trap 'rm -f "$tmpfile"' EXIT
 
-    sed "s/SCRIPTNAME/${name}/g" << 'TEMPLATE' > "$tmpfile"
-#!/usr/bin/env bash
+    template='#!/usr/bin/env bash
 #	SCRIPTNAME 1.0
 #	One-line description
 #	Dependencies: none
@@ -232,8 +232,8 @@ _j_new() {
 source "$(dirname "${BASH_SOURCE[0]}")/j"
 
 [[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
-[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "SCRIPTNAME" && exit 0
-TEMPLATE
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "SCRIPTNAME" && exit 0'
+    printf '%s\n' "${template//SCRIPTNAME/$name}" > "$tmpfile"
 
     j::edit_or_discard "$tmpfile" || { j::info "No changes - file not created"; return 0; }
 

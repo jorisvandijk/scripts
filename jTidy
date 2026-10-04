@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jTidy 3.2
+#	jTidy 3.3
 #	Audit the macOS home directory and guide an interactive cleanup
 #	Dependencies: fzf, brew, du, df, find
 #	Keywords: cleanup, organize, home directory, dotfiles, audit, declutter
@@ -104,13 +104,15 @@ _report_sizes() {
 
 # Lowercased names of everything installed, for the orphan cross-reference.
 _installed_names() {
-    {
+    local out
+    out=$(
         brew list --formula 2>/dev/null
         brew list --cask 2>/dev/null
         ls /Applications 2>/dev/null | sed 's/\.app$//'
         ls ~/.local/bin 2>/dev/null
         ls ~/.local/share 2>/dev/null
-    } | tr '[:upper:]' '[:lower:]'
+    )
+    printf '%s\n' "${out,,}"
 }
 
 _format_config_entry() {

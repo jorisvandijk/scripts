@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jBlog 3.3
+#	jBlog 3.4
 #	Write and publish a Hugo blog post
 #	Dependencies: hugo, zeditor, git, fzf
 #	Keywords: write, post, article, hugo, publish, draft, blog
@@ -34,10 +34,11 @@ _find_draft() {
 }
 
 _create_draft() {
-    local timestamp; timestamp="$(date +%Y%m%d%H%M%S)"
-    local rel_path="posts/untitled-${timestamp}.md"
+    local timestamp rel_path
+    printf -v timestamp '%(%Y%m%d%H%M%S)T' -1
+    rel_path="posts/untitled-${timestamp}.md"
     hugo new "$rel_path" >&2 || j::die "Hugo could not create the draft"
-    echo "$WEBSITE_DIR/content/$rel_path"
+    printf '%s\n' "$WEBSITE_DIR/content/$rel_path"
 }
 
 _cleanup() {
@@ -83,11 +84,18 @@ _slugify() {
 _update_front_matter() {
     local draft_file="$1"
     local title="$2"
-    local now; now="$(date "+%Y-%m-%dT%H:%M:%S%z")"
+    local now tmp
+    printf -v now '%(%Y-%m-%dT%H:%M:%S%z)T' -1
     now="${now::-2}:${now: -2}"
-    POST_TITLE="$title" perl -i -pe 'BEGIN{$t=delete $ENV{POST_TITLE}} s/^title:.*$/title: "$t"/' "$draft_file"
-    sed -i '' "s|^date:.*|date: ${now}|"         "$draft_file"
-    sed -i '' 's/^draft: true/draft: false/'      "$draft_file"
+    tmp="$(mktemp)"
+    while IFS= read -r line; do
+        case "$line" in
+            title:*)       printf 'title: "%s"\n' "$title" ;;
+            date:*)        printf 'date: %s\n' "$now" ;;
+            "draft: true") printf 'draft: false\n' ;;
+            *)             printf '%s\n' "$line" ;;
+        esac
+    done < "$draft_file" > "$tmp" && mv "$tmp" "$draft_file"
 }
 
 _prompt_title() {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jFlac2Alac 3.0
+#	jFlac2Alac 3.1
 #	Batch-convert FLAC files to Apple Lossless (ALAC)
 #	Dependencies: ffmpeg
 #	Keywords: audio, music, convert, flac, alac, lossless, apple music
@@ -21,7 +21,9 @@ j::require ffmpeg
 LOG_FILE="$1/log.txt"
 
 _log_failure() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] FAILED: $1" >> "$LOG_FILE"
+    local timestamp
+    printf -v timestamp '%(%Y-%m-%d %H:%M:%S)T' -1
+    printf '[%s] FAILED: %s\n' "$timestamp" "$1" >> "$LOG_FILE"
 }
 
 _convert_file() {
