@@ -118,7 +118,7 @@ Add a no-argument guard if the script takes no arguments:
 | `j::info "msg"` | Green `[INFO]` to stdout |
 | `j::warn "msg"` | Yellow `[WARNING]` to stderr |
 | `j::error "msg"` | Red `[ERROR]` to stderr |
-| `j::die "msg"` | Red `Error:` to stderr, exit 1 |
+| `j::die "msg"` | Red `[ERROR]` to stderr, exit 1 |
 | `j::version "$0"` | Print line 2 of the script header |
 | `j::help "jName"` | Print the SYNOPSIS section from `man/jName.txt` |
 | `j::show_man "jName"` | Open `man/jName.txt` in `$PAGER` |
@@ -135,7 +135,18 @@ Add a no-argument guard if the script takes no arguments:
 
 All three pickers share a common house style (`J_FZF_STYLE`) defined in `j`. The input label is set automatically to `jScripts · <script-name>`. Pass a bare word as the prompt — the helper appends the colon.
 
-Colors available directly in any script: `$J_RED`, `$J_GREEN`, `$J_YELLOW`, `$J_PURPLE`, `$J_RESET`, `$J_BOLD`, `$J_DIM`, `$J_CYAN`.
+Colors and styles available directly in any script:
+
+| Variable | Effect |
+|---|---|
+| `$J_RED` | Red text |
+| `$J_GREEN` | Green text |
+| `$J_YELLOW` | Yellow text |
+| `$J_CYAN` | Cyan text |
+| `$J_PURPLE` | Purple text |
+| `$J_BOLD` | Bold text |
+| `$J_DIM` | Dimmed text |
+| `$J_RESET` | Reset all formatting |
 
 ### Code style
 
@@ -207,7 +218,7 @@ Add every new script to the `## Scripts` table below.
 | Git repos scanned by jRepos | `~/git/` |
 | Hugo site (jHugoHelper) | `~/git/website/` |
 | jNewRepo API config | `~/git/documents/newrepo/config` |
-| Dotfiles repo (jTidy) | `~/git/macbook/` |
+| Dotfiles repo (jTidy) | `~/git/dotfiles/` |
 
 ---
 
