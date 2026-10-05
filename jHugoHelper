@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-#	jHugoHelper 4.0
-#	Hugo site helper: server, new post, new status
+#	jHugoHelper 4.1
+#	Hugo site helper: server, new post, new microblog
 #	Dependencies: hugo
 #	Keywords: hugo, website, server, static site, post, preview
-#	Usage: jHugoHelper {server|new|status} [post-name]
+#	Usage: jHugoHelper {server|new|microblog} [post-name]
 #
 #	By Joris van Dijk | Jorisvandijk.com
 #	Licensed under the MIT license
@@ -13,7 +13,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 [[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
 [[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jHugoHelper" && exit 0
 
-[[ -z "$1" ]] && j::die "Usage: jHugoHelper {server|new|status} [post-name]"
+[[ -z "$1" ]] && j::die "Usage: jHugoHelper {server|new|microblog} [post-name]"
 
 j::require hugo rm
 
@@ -30,14 +30,14 @@ _new_post() {
     j::edit_or_discard "$filepath" || { j::info "No changes - post discarded"; exit 0; }
 }
 
-_new_status() {
+_new_microblog() {
     _enter_website_dir
     local timestamp filepath
     printf -v timestamp '%(%Y-%m-%d-%H%M%S)T' -1
     filepath="content/microblog/${timestamp}.md"
     [[ -e "$filepath" ]] && j::die "Path already exists: ${filepath}"
     hugo new "microblog/${timestamp}.md" || j::die "Hugo could not create the status"
-    j::edit_or_discard "$filepath" || { j::info "No changes - status discarded"; exit 0; }
+    j::edit_or_discard "$filepath" || { j::info "No changes - microblog discarded"; exit 0; }
 }
 
 case "$1" in
@@ -47,6 +47,6 @@ case "$1" in
         hugo server -D
         ;;
     new)    _new_post "${2:-}" ;;
-    status) _new_status ;;
-    *)      j::die "Usage: jHugoHelper {server|new|status} [post-name]" ;;
+    microblog) _new_microblog ;;
+    *)         j::die "Usage: jHugoHelper {server|new|microblog} [post-name]" ;;
 esac
