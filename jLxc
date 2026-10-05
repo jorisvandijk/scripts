@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jLxc 4.0
+#	jLxc 4.1
 #	Toggle Proxmox LXC containers on/off
 #	Dependencies: fzf, ssh
 #	Keywords: lxc, container, proxmox, vm, toggle, start, stop
@@ -17,51 +17,51 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 j::require_vars JVAR_HOMELAB_ROOT
 
 _fetch_containers() {
-	ssh "$JVAR_HOMELAB_ROOT" "pct list" 2>/dev/null
+    ssh "$JVAR_HOMELAB_ROOT" "pct list" 2>/dev/null
 }
 
 _format_container_row() {
-	local name="$1" vmid="$2" status="$3"
-	case "$status" in
-		running) printf "${J_GREEN}● running${J_RESET}\t%-30s\t%s\trunning\n" "$name" "$vmid" ;;
-		*)       printf "${J_DIM}○ stopped${J_RESET}\t%-30s\t%s\t${status}\n" "$name" "$vmid" ;;
-	esac
+    local name="$1" vmid="$2" status="$3"
+    case "$status" in
+        running) printf "${J_GREEN}● running${J_RESET}\t%-30s\t%s\trunning\n" "$name" "$vmid" ;;
+        *)       printf "${J_DIM}○ stopped${J_RESET}\t%-30s\t%s\t${status}\n" "$name" "$vmid" ;;
+    esac
 }
 
 _build_fzf_input() {
-	local raw="$1"
-	local lines=() line vmid status name rest
-	mapfile -t lines <<< "$raw"
-	for line in "${lines[@]:1}"; do
-		read -r vmid status name rest <<< "$line"
-		_format_container_row "$name" "$vmid" "$status"
-	done
+    local raw="$1"
+    local lines=() line vmid status name rest
+    mapfile -t lines <<< "$raw"
+    for line in "${lines[@]:1}"; do
+        read -r vmid status name rest <<< "$line"
+        _format_container_row "$name" "$vmid" "$status"
+    done
 }
 
 _pick_container() {
-	local input="$1"
-	j::pick_table "Container" "1,2,3" single <<< "$input"
+    local input="$1"
+    j::pick_table "Container" "1,2,3" single <<< "$input"
 }
 
 _toggle_container() {
-	local vmid="$1"
-	local status="$2"
-	local output
-	case "$status" in
-		running)
-			j::info "Stopping container ${vmid}..."
-			output=$(ssh "$JVAR_HOMELAB_ROOT" -- pct stop "$vmid" 2>&1) || j::die "${output:-Failed to stop container ${vmid}}"
-			j::info "Container ${vmid} stopped"
-			;;
-		stopped)
-			j::info "Starting container ${vmid}..."
-			output=$(ssh "$JVAR_HOMELAB_ROOT" -- pct start "$vmid" 2>&1) || j::die "${output:-Failed to start container ${vmid}}"
-			j::info "Container ${vmid} started"
-			;;
-		*)
-			j::die "Cannot toggle container in status: ${status}"
-			;;
-	esac
+    local vmid="$1"
+    local status="$2"
+    local output
+    case "$status" in
+        running)
+            j::info "Stopping container ${vmid}..."
+            output=$(ssh "$JVAR_HOMELAB_ROOT" -- pct stop "$vmid" 2>&1) || j::die "${output:-Failed to stop container ${vmid}}"
+            j::info "Container ${vmid} stopped"
+            ;;
+        stopped)
+            j::info "Starting container ${vmid}..."
+            output=$(ssh "$JVAR_HOMELAB_ROOT" -- pct start "$vmid" 2>&1) || j::die "${output:-Failed to start container ${vmid}}"
+            j::info "Container ${vmid} started"
+            ;;
+        *)
+            j::die "Cannot toggle container in status: ${status}"
+            ;;
+    esac
 }
 
 j::require ssh
