@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jEject 3.3
+#	jEject 4.0
 #	Eject a mounted drive
 #	Dependencies: fzf, diskutil (macOS), lsblk, udisksctl or eject (Linux)
 #	Keywords: unmount, usb, drive, disk, volume, safely remove

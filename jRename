@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jRename 3.2
+#	jRename 4.0
 #	Rename files in current directory: lowercase, spaces and underscores to hyphens
 #	Dependencies: none
 #	Keywords: rename, lowercase, label, new name, hyphen, underscore

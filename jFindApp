@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jFindApp 3.3
+#	jFindApp 4.0
 #	Search for an app across App Store, Homebrew, and Nix
 #	Dependencies: mas, brew, nix
 #	Keywords: install, search, find, application, app store, homebrew, software

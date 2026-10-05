@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jBlog 3.6
+#	jBlog 4.0
 #	Write and publish a Hugo blog post
 #	Dependencies: hugo, zeditor, git, fzf, curl, lsof
 #	Keywords: write, post, article, hugo, publish, draft, blog
@@ -14,7 +14,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 [[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jBlog" && exit 0
 [[ -n "$1" ]]                             && j::die "Usage: jBlog (no arguments)"
 
-WEBSITE_DIR="$HOME/git/website"
+j::require_vars JVAR_HUGO_SITE_DIR JVAR_HUGO_URL
+
 HUGO_PID=""
 TITLE=""
 DEST=""
@@ -22,12 +23,12 @@ DRAFT_FILE=""
 
 _preflight() {
     j::require hugo git zeditor basename curl grep lsof mktemp mv open rm sed sleep sort tr
-    cd "$WEBSITE_DIR" || j::die "Could not cd to $WEBSITE_DIR"
+    cd "$JVAR_HUGO_SITE_DIR" || j::die "Could not cd to $JVAR_HUGO_SITE_DIR"
 }
 
 _find_draft() {
     shopt -s nullglob
-    local drafts=("$WEBSITE_DIR/content/posts/untitled-"*.md)
+    local drafts=("$JVAR_HUGO_SITE_DIR/content/posts/untitled-"*.md)
     shopt -u nullglob
     [[ ${#drafts[@]} -gt 1 ]] && j::warn "Found ${#drafts[@]} drafts — using oldest; others may need cleanup"
     [[ ${#drafts[@]} -gt 0 ]] && printf '%s\n' "${drafts[0]}"
@@ -38,16 +39,16 @@ _create_draft() {
     printf -v timestamp '%(%Y%m%d%H%M%S)T' -1
     rel_path="posts/untitled-${timestamp}.md"
     hugo new "$rel_path" >&2 || j::die "Hugo could not create the draft"
-    printf '%s\n' "$WEBSITE_DIR/content/$rel_path"
+    printf '%s\n' "$JVAR_HUGO_SITE_DIR/content/$rel_path"
 }
 
 _cleanup() {
     [[ -n "$HUGO_PID" ]] && kill "$HUGO_PID" 2>/dev/null
-    rm -f "$WEBSITE_DIR/.hugo_build.lock" 2>/dev/null
+    rm -f "$JVAR_HUGO_SITE_DIR/.hugo_build.lock" 2>/dev/null
 }
 
 _ensure_server() {
-    lsof -i :1313 -sTCP:LISTEN &>/dev/null && return 0
+    lsof -i :"${JVAR_HUGO_URL##*:}" -sTCP:LISTEN &>/dev/null && return 0
     hugo server -D &>/dev/null &
     HUGO_PID=$!
     j::info "Starting Hugo server..."
@@ -67,7 +68,7 @@ _wait_for_server() {
 
 _start_server() {
     local slug; slug="$(basename "$DRAFT_FILE" .md)"
-    local url="http://localhost:1313/posts/${slug}/"
+    local url="${JVAR_HUGO_URL}/posts/${slug}/"
     _ensure_server
     _wait_for_server "$url"
     open "$url"
@@ -109,7 +110,7 @@ _finish_post() {
     local draft_file="$1"
     _prompt_title
     local slug; slug="$(_slugify "$TITLE")"
-    DEST="$WEBSITE_DIR/content/posts/${slug}.md"
+    DEST="$JVAR_HUGO_SITE_DIR/content/posts/${slug}.md"
     [[ -e "$DEST" ]] && j::die "A post already exists at ${DEST} — draft preserved at ${draft_file}"
     _update_front_matter "$draft_file" "$TITLE"
     mv "$draft_file" "$DEST"
@@ -118,7 +119,7 @@ _finish_post() {
 
 _existing_tags() {
     # no builtin alternative for sort -u dedup; sed handles multi-step YAML stripping
-    grep -h "^tags:" "$WEBSITE_DIR/content/posts/"*.md 2>/dev/null \
+    grep -h "^tags:" "$JVAR_HUGO_SITE_DIR/content/posts/"*.md 2>/dev/null \
         | sed 's/tags: \[//; s/\]//; s/"//g; s/ //g' \
         | tr ',' '\n' | sort -u | grep -v '^$'
 }

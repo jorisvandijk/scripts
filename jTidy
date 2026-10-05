@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jTidy 3.5
+#	jTidy 4.0
 #	Audit the macOS home directory and guide an interactive cleanup
 #	Dependencies: fzf, brew
 #	Keywords: cleanup, organize, home directory, dotfiles, audit, declutter
@@ -17,6 +17,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 [[ "$(j::os)" == "macos" ]] || j::die "This script only supports macOS"
 
 j::require brew du df find awk grep head ls rm sed sort sudo tmutil
+
+j::require_vars JVAR_DOTFILES_DIR
 
 _avail_bytes() { df -k / | awk 'NR==2 {print $4 * 1024}'; }
 _home_bytes()  { du -sk ~ 2>/dev/null | awk '{print $1 * 1024}'; }
@@ -117,7 +119,7 @@ _delete_selected() {
 
 _maybe_remove_dotfiles_entry() {
     local name="$1"
-    local repo_path="$HOME/git/macbook/$name"
+    local repo_path="$JVAR_DOTFILES_DIR/$name"
     [[ -e "$repo_path" ]] || return
     j::confirm "Also remove dotfiles repo entry $repo_path?" N || return
     rm -rf "$repo_path" && j::msg "${J_GREEN}✓ Removed: $repo_path${J_RESET}"
@@ -274,7 +276,7 @@ BEFORE_HOME=$(_home_bytes)
 _baseline
 _report_sizes "TOP-LEVEL ~ (visible)" 10 ~/*
 _report_sizes "HIDDEN FILES IN ~" 15 ~/.??*
-j::msg "${J_DIM}0B entries are usually Stow symlinks to ~/git/macbook/.${J_RESET}"
+j::msg "${J_DIM}0B entries are usually Stow symlinks to ${JVAR_DOTFILES_DIR}/.${J_RESET}"
 _report_sizes "~/Library/Application Support (top 15)" 15 ~/Library/Application\ Support/*
 _report_sizes "~/Library/Containers (top 10)" 10 ~/Library/Containers/*
 _report_sizes "~/Library/Caches (top 15)" 15 ~/Library/Caches/*

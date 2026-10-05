@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jFlac2Alac 3.2
+#	jFlac2Alac 4.0
 #	Batch-convert FLAC files to Apple Lossless (ALAC)
 #	Dependencies: ffmpeg
 #	Keywords: audio, music, convert, flac, alac, lossless, apple music

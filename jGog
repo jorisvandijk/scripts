@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jGog 3.6
+#	jGog 4.0
 #	Browse GOG library and download games locally or to homelab
 #	Dependencies: lgogdownloader, fzf, ssh
 #	Keywords: gog, download, games, library, backup, installer, homelab
@@ -15,8 +15,6 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 [[ -n "$1" && "$1" != "--homelab" ]]      && j::die "Usage: jGog [--homelab]"
 
 DOWNLOAD_DIR="${HOME}/Downloads"
-HOMELAB_HOST="joris@192.168.1.5"
-HOMELAB_PATH="/data/games/gog/"
 
 _ensure_login() {
     local cred_file="${HOME}/.config/lgogdownloader/cookies.txt"
@@ -124,7 +122,7 @@ _run_installer() {
     if [[ "$USE_HOMELAB" == true ]]; then
         # flags is an internal, trusted string of lgogdownloader options — word-split is intentional
         # shellcheck disable=SC2086
-        ssh "$HOMELAB_HOST" -- lgogdownloader --download --game "^${game_id}$" $flags --directory "$HOMELAB_PATH" \
+        ssh "$JVAR_HOMELAB_USER" -- lgogdownloader --download --game "^${game_id}$" $flags --directory "$JVAR_GOG_PATH" \
             || j::error "Download failed (${download_label})"
     else
         # shellcheck disable=SC2086
@@ -134,28 +132,29 @@ _run_installer() {
 }
 
 _homelab_has_lgogdownloader() {
-    ssh "$HOMELAB_HOST" "command -v lgogdownloader" &>/dev/null
+    ssh "$JVAR_HOMELAB_USER" "command -v lgogdownloader" &>/dev/null
 }
 
 _homelab_has_credentials() {
-    ssh "$HOMELAB_HOST" "test -s ~/.config/lgogdownloader/galaxy_tokens.json" 2>/dev/null
+    ssh "$JVAR_HOMELAB_USER" "test -s ~/.config/lgogdownloader/galaxy_tokens.json" 2>/dev/null
 }
 
 _copy_credentials_to_homelab() {
     local cred_dir="${HOME}/.config/lgogdownloader"
-    ssh "$HOMELAB_HOST" "mkdir -p ~/.config/lgogdownloader"
+    ssh "$JVAR_HOMELAB_USER" "mkdir -p ~/.config/lgogdownloader"
     scp "${cred_dir}/cookies.txt" "${cred_dir}/galaxy_tokens.json" \
-        "${HOMELAB_HOST}:~/.config/lgogdownloader/" \
-        || j::die "Failed to copy credentials to ${HOMELAB_HOST}"
-    j::info "Credentials copied to ${HOMELAB_HOST}"
+        "${JVAR_HOMELAB_USER}:~/.config/lgogdownloader/" \
+        || j::die "Failed to copy credentials to ${JVAR_HOMELAB_USER}"
+    j::info "Credentials copied to ${JVAR_HOMELAB_USER}"
 }
 
 _check_homelab() {
+    j::require_vars JVAR_HOMELAB_USER JVAR_GOG_PATH
     _homelab_has_lgogdownloader \
-        || j::die "lgogdownloader not found on ${HOMELAB_HOST}. Install it first: apt install lgogdownloader"
+        || j::die "lgogdownloader not found on ${JVAR_HOMELAB_USER}. Install it first: apt install lgogdownloader"
     _homelab_has_credentials && return 0
-    j::warn "No GOG credentials found on ${HOMELAB_HOST}."
-    j::confirm "Copy credentials from this machine to ${HOMELAB_HOST}?" N \
+    j::warn "No GOG credentials found on ${JVAR_HOMELAB_USER}."
+    j::confirm "Copy credentials from this machine to ${JVAR_HOMELAB_USER}?" N \
         || j::die "Credentials required on homelab to download remotely"
     _copy_credentials_to_homelab
 }

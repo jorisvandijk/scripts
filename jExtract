@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jExtract 3.0
+#	jExtract 4.0
 #	Smart archive extraction
 #	Dependencies: tar, unzip, bunzip2, gunzip, unxz, 7zz
 #	Keywords: unzip, uncompress, untar, archive, zip, tar, rar

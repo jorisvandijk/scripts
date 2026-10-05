@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jTube 3.2
+#	jTube 4.0
 #	Resolve YouTube channel IDs and output Nix RSS feed entries
 #	Dependencies: curl
 #	Keywords: youtube, channel, id, rss, nix, feed, subscribe

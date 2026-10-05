@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	j 3.8
+#	j 4.0
 #	jScripts shared library and CLI tooling
 #	Dependencies: none
 #	Keywords: library, cli, help, list, new, man
@@ -33,6 +33,9 @@ J_FZF_STYLE=(
     --padding=0,0,0,0
 )
 
+_J_VARS="$(dirname "${BASH_SOURCE[0]}")/j.vars"
+[[ -f "$_J_VARS" ]] && source "$_J_VARS"
+
 _j_cap() { local text="$*"; printf '%s' "${text^}"; }
 
 j::info()  { printf "${J_GREEN}[INFO]${J_RESET} %s\n"     "$(_j_cap "$*")"; }
@@ -45,6 +48,13 @@ j::require() {
     local prog
     for prog in "$@"; do
         command -v "$prog" &>/dev/null || j::die "Required program $prog is not installed"
+    done
+}
+
+j::require_vars() {
+    local var
+    for var in "$@"; do
+        [[ -n "${!var}" ]] || j::die "$var is not set — add it to j.vars"
     done
 }
 

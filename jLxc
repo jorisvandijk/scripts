@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jLxc 3.2
+#	jLxc 4.0
 #	Toggle Proxmox LXC containers on/off
 #	Dependencies: fzf, ssh
 #	Keywords: lxc, container, proxmox, vm, toggle, start, stop
@@ -14,10 +14,10 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 [[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jLxc" && exit 0
 [[ -n "$1" ]] && j::die "Usage: jLxc (no arguments)"
 
-PROXMOX_HOST="root@192.168.1.5"
+j::require_vars JVAR_HOMELAB_ROOT
 
 _fetch_containers() {
-	ssh "$PROXMOX_HOST" "pct list" 2>/dev/null
+	ssh "$JVAR_HOMELAB_ROOT" "pct list" 2>/dev/null
 }
 
 _format_container_row() {
@@ -50,12 +50,12 @@ _toggle_container() {
 	case "$status" in
 		running)
 			j::info "Stopping container ${vmid}..."
-			output=$(ssh "$PROXMOX_HOST" -- pct stop "$vmid" 2>&1) || j::die "${output:-Failed to stop container ${vmid}}"
+			output=$(ssh "$JVAR_HOMELAB_ROOT" -- pct stop "$vmid" 2>&1) || j::die "${output:-Failed to stop container ${vmid}}"
 			j::info "Container ${vmid} stopped"
 			;;
 		stopped)
 			j::info "Starting container ${vmid}..."
-			output=$(ssh "$PROXMOX_HOST" -- pct start "$vmid" 2>&1) || j::die "${output:-Failed to start container ${vmid}}"
+			output=$(ssh "$JVAR_HOMELAB_ROOT" -- pct start "$vmid" 2>&1) || j::die "${output:-Failed to start container ${vmid}}"
 			j::info "Container ${vmid} started"
 			;;
 		*)
@@ -67,7 +67,7 @@ _toggle_container() {
 j::require ssh
 
 RAW=$(_fetch_containers)
-[[ -z "$RAW" ]] && j::die "Failed to connect to ${PROXMOX_HOST}"
+[[ -z "$RAW" ]] && j::die "Failed to connect to ${JVAR_HOMELAB_ROOT}"
 
 FZF_INPUT=$(_build_fzf_input "$RAW")
 [[ -z "$FZF_INPUT" ]] && j::die "No containers found"

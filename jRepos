@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jRepos 3.1
+#	jRepos 4.0
 #	Show git status of all repositories in ~/git
 #	Dependencies: git
 #	Keywords: git status, repositories, overview, dirty, branches
@@ -16,7 +16,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 
 j::require git
 
-GIT_BASE_DIR="${HOME}/git"
+j::require_vars JVAR_REPOS_DIR
 
 _count_states() {
     local line index_status work_status
@@ -60,7 +60,7 @@ _print_group() {
     done
 }
 
-[[ ! -d "$GIT_BASE_DIR" ]] && j::die "Git directory not found: $GIT_BASE_DIR"
+[[ ! -d "$JVAR_REPOS_DIR" ]] && j::die "Git directory not found: $JVAR_REPOS_DIR"
 
 _process_repo() {
     local repo_dir="$1"
@@ -86,13 +86,13 @@ _process_repo() {
 
 CONFLICT_ENTRIES=() SYNC_ENTRIES=() DIRTY_ENTRIES=() CLEAN_ENTRIES=()
 
-for REPO_DIR in "$GIT_BASE_DIR"/*/; do
+for REPO_DIR in "$JVAR_REPOS_DIR"/*/; do
     [[ -d "$REPO_DIR/.git" ]] || continue
     _process_repo "$REPO_DIR"
 done
 
 TOTAL=$(( ${#CONFLICT_ENTRIES[@]} + ${#SYNC_ENTRIES[@]} + ${#DIRTY_ENTRIES[@]} + ${#CLEAN_ENTRIES[@]} ))
-[[ "$TOTAL" -eq 0 ]] && j::info "No Git repositories found in: $GIT_BASE_DIR" && exit 0
+[[ "$TOTAL" -eq 0 ]] && j::info "No Git repositories found in: $JVAR_REPOS_DIR" && exit 0
 
 _print_group "$J_RED"    "${CONFLICT_ENTRIES[@]}"
 _print_group "$J_CYAN"   "${SYNC_ENTRIES[@]}"

@@ -124,6 +124,7 @@ Add a no-argument guard if the script takes no arguments:
 | `j::show_man "jName"` | Open `man/jName.txt` in `$PAGER` |
 | `j::row "$color" "name" "label"` | Print a color-coded `%-20s` aligned row (for tabular output) |
 | `j::require prog [prog2 ...]` | Die if any listed program is not in PATH |
+| `j::require_vars JVAR_ [JVAR_2 ...]` | Die with a clear message if any listed `JVAR_` variable is unset |
 | `j::os` | Print `macos` or `linux`; die on unsupported OS |
 | `j::edit_or_discard file` | Open file in `$EDITOR`; remove it and return 1 if unchanged, return 0 if changed |
 | `j::msg "msg"` | Print message to stdout with no prefix |
@@ -161,6 +162,7 @@ Colors and styles available directly in any script:
 7. **Prefix internal functions with `_`** - Every function defined inside a script is prefixed with `_`. This distinguishes script-local helpers from library functions (`j::`) and shell built-ins.
 8. **Variable naming** - Script-level (global) variables use UPPERCASE. Variables declared inside a function use `local` and are lowercase. Loop variables at script level follow the global convention: UPPERCASE.
 9. **Prefer builtins over external commands** - Use `$(<file)` instead of `$(cat file)` to read a file into a variable. Avoid spawning a subprocess when a bash builtin achieves the same result.
+10. **No hardcoded personal values** - IPs, paths, usernames, and any other environment-specific value belong in `j.vars` and must be referenced via `JVAR_` variables. Call `j::require_vars` to guard required variables at script start.
 
 ### Man page
 
@@ -209,16 +211,32 @@ Add every new script to the `## Scripts` table below.
 
 ---
 
-## Hardcoded locations
+## j.vars
 
-| What | Path |
-|---|---|
-| Scripts directory | `~/git/scripts/` |
-| Man pages | `~/git/scripts/man/` |
-| Git repos scanned by jRepos | `~/git/` |
-| Hugo site (jHugoHelper) | `~/git/website/` |
-| jNewRepo API config | `~/git/documents/newrepo/config` |
-| Dotfiles repo (jTidy) | `~/git/dotfiles/` |
+`j.vars` lives in the repo root and is sourced automatically by `j` on every script run. It holds all environment-specific values for the suite. Never hardcode personal values in scripts — define them here and reference them via their `JVAR_` name.
+
+To guard required variables at the start of a script:
+
+```bash
+j::require_vars JVAR_HOMELAB_USER JVAR_REPOS_DIR
+```
+
+This dies with a clear message if any listed variable is unset, pointing the user to `j.vars`.
+
+### Available variables
+
+| Variable | Used by | Purpose |
+|---|---|---|
+| `JVAR_HOMELAB_USER` | jGog, jSync | User SSH access to homelab |
+| `JVAR_HOMELAB_ROOT` | jLxc | Root SSH access to homelab (Proxmox) |
+| `JVAR_GOG_PATH` | jGog | GOG download directory on homelab |
+| `JVAR_SERVER_ROOT` | jSync | Root data directory on homelab |
+| `JVAR_HUGO_SITE_DIR` | jBlog, jHugoHelper | Local Hugo site directory |
+| `JVAR_HUGO_URL` | jBlog | Hugo dev server URL |
+| `JVAR_NEWREPO_CONFIG` | jNewRepo | Path to the newrepo token config file |
+| `JVAR_GIT_USERNAME` | jNewRepo | Git forge username |
+| `JVAR_REPOS_DIR` | jRepos | Base directory scanned for git repos |
+| `JVAR_DOTFILES_DIR` | jTidy | Dotfiles repository path |
 
 ---
 

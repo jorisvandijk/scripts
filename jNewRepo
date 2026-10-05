@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jNewRepo 3.2
+#	jNewRepo 4.0
 #	Initialize a local git repo and create it on GitHub, GitLab, Codeberg, and Bitbucket
 #	Dependencies: git, curl
 #	Keywords: github, gitlab, codeberg, bitbucket, create, initialize, new repo
@@ -36,11 +36,11 @@ REPO_PATH="$2"
 DESCRIPTION="${DESCRIPTION//\\/\\\\}"
 DESCRIPTION="${DESCRIPTION//\"/\\\"}"
 
-CONFIG_FILE="$HOME/git/documents/newrepo/config"
+j::require_vars JVAR_NEWREPO_CONFIG JVAR_GIT_USERNAME
 
-[[ ! -f "$CONFIG_FILE" ]] && j::die "Config file not found at ${CONFIG_FILE} - create it with GITHUB_TOKEN, GITLAB_TOKEN, CODEBERG_TOKEN, BITBUCKET_WORKSPACE, BITBUCKET_EMAIL, BITBUCKET_API_TOKEN"
+[[ ! -f "$JVAR_NEWREPO_CONFIG" ]] && j::die "Config file not found at ${JVAR_NEWREPO_CONFIG} - create it with GITHUB_TOKEN, GITLAB_TOKEN, CODEBERG_TOKEN, BITBUCKET_WORKSPACE, BITBUCKET_EMAIL, BITBUCKET_API_TOKEN"
 
-source "$CONFIG_FILE"
+source "$JVAR_NEWREPO_CONFIG"
 
 [[ ! -d "$REPO_PATH" ]]    && j::die "Directory '$REPO_PATH' does not exist"
 [[ -d "$REPO_PATH/.git" ]] && j::die "Directory '$REPO_PATH' already has a .git directory"
@@ -98,9 +98,9 @@ _init_local_repo() {
     git branch -M main
     git remote add origin git@bitbucket.org:"$BITBUCKET_WORKSPACE"/"$REPO_NAME".git
     git remote set-url --add --push origin git@bitbucket.org:"$BITBUCKET_WORKSPACE"/"$REPO_NAME".git
-    git remote set-url --add --push origin git@github.com:jorisvandijk/"$REPO_NAME".git
-    git remote set-url --add --push origin git@gitlab.com:jorisvandijk/"$REPO_NAME".git
-    git remote set-url --add --push origin git@codeberg.org:jorisvandijk/"$REPO_NAME".git
+    git remote set-url --add --push origin git@github.com:${JVAR_GIT_USERNAME}/"$REPO_NAME".git
+    git remote set-url --add --push origin git@gitlab.com:${JVAR_GIT_USERNAME}/"$REPO_NAME".git
+    git remote set-url --add --push origin git@codeberg.org:${JVAR_GIT_USERNAME}/"$REPO_NAME".git
 }
 
 _run_preflight() {
@@ -108,19 +108,19 @@ _run_preflight() {
     _check_auth   "GitHub auth" https://api.github.com/user \
         -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
         || PREFLIGHT_FAILED=true
-    _check_exists "GitHub repo" "https://api.github.com/repos/jorisvandijk/$REPO_NAME" \
+    _check_exists "GitHub repo" "https://api.github.com/repos/${JVAR_GIT_USERNAME}/$REPO_NAME" \
         -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
         || PREFLIGHT_FAILED=true
     _check_auth   "GitLab auth" https://gitlab.com/api/v4/user \
         -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
         || PREFLIGHT_FAILED=true
-    _check_exists "GitLab repo" "https://gitlab.com/api/v4/projects/jorisvandijk%2F$REPO_NAME" \
+    _check_exists "GitLab repo" "https://gitlab.com/api/v4/projects/${JVAR_GIT_USERNAME}%2F$REPO_NAME" \
         -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
         || PREFLIGHT_FAILED=true
     _check_auth   "Codeberg auth" https://codeberg.org/api/v1/user \
         -H "Authorization: token $CODEBERG_TOKEN" \
         || PREFLIGHT_FAILED=true
-    _check_exists "Codeberg repo" "https://codeberg.org/api/v1/repos/jorisvandijk/$REPO_NAME" \
+    _check_exists "Codeberg repo" "https://codeberg.org/api/v1/repos/${JVAR_GIT_USERNAME}/$REPO_NAME" \
         -H "Authorization: token $CODEBERG_TOKEN" \
         || PREFLIGHT_FAILED=true
     _check_auth   "Bitbucket auth" https://api.bitbucket.org/2.0/user \

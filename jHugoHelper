@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jHugoHelper 3.2
+#	jHugoHelper 4.0
 #	Hugo site helper: server, new post, new status
 #	Dependencies: hugo
 #	Keywords: hugo, website, server, static site, post, preview
@@ -17,9 +17,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/j"
 
 j::require hugo rm
 
-WEBSITE_DIR="$HOME/git/website"
+j::require_vars JVAR_HUGO_SITE_DIR
 
-_enter_website_dir() { cd "$WEBSITE_DIR" || j::die "Could not cd to $WEBSITE_DIR"; }
+_enter_website_dir() { cd "$JVAR_HUGO_SITE_DIR" || j::die "Could not cd to $JVAR_HUGO_SITE_DIR"; }
 
 _new_post() {
     local post_name="$1"
@@ -43,7 +43,7 @@ _new_status() {
 case "$1" in
     server)
         _enter_website_dir
-        trap 'rm -f "$WEBSITE_DIR/.hugo_build.lock"' EXIT
+        trap 'rm -f "$JVAR_HUGO_SITE_DIR/.hugo_build.lock"' EXIT
         hugo server -D
         ;;
     new)    _new_post "${2:-}" ;;

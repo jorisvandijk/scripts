@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jHeic2Png 3.0
+#	jHeic2Png 4.0
 #	Convert HEIC images to PNG
 #	Dependencies: sips (macOS), heif-convert (Linux)
 #	Keywords: image, photo, convert, heic, png, iphone, camera
