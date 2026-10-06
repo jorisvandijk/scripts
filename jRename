@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jRename 4.0
+#	jRename 4.1
 #	Rename files in current directory: lowercase, spaces and underscores to hyphens
 #	Dependencies: none
 #	Keywords: rename, lowercase, label, new name, hyphen, underscore
@@ -26,7 +26,7 @@ _process_files() {
         candidate="${candidate//_/-}"
 
         [[ "$candidate" == "$file" ]] && continue
-        [[ -e "$candidate" ]] && ! [[ "$file" -ef "$candidate" ]] && { j::warn "Skipping '$file': '$candidate' already exists"; continue; }
+        [[ -e "$candidate" && ! "$file" -ef "$candidate" ]] && { j::warn "Skipping '$file': '$candidate' already exists"; continue; }
         mv -- "$file" "$candidate"
         j::info "Renamed: '$file' → '$candidate'"
         changed=$(( changed + 1 ))
