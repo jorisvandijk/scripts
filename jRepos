@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jRepos 4.0
+#	jRepos 4.1
 #	Show git status of all repositories in ~/git
 #	Dependencies: git
 #	Keywords: git status, repositories, overview, dirty, branches
@@ -24,7 +24,9 @@ _count_states() {
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
         index_status="${line:0:1}" work_status="${line:1:1}"
-        [[ "$index_status" == "U" || "$work_status" == "U" || "$index_status$work_status" == "AA" || "$index_status$work_status" == "DD" ]] && { conflicted=$((conflicted + 1)); continue; }
+        case "${index_status}${work_status}" in
+            U*|*U|AA|DD) (( conflicted++ )); continue ;;
+        esac
         [[ "$index_status" == [MADRC] ]] && staged=$((staged + 1))
         [[ "$work_status" == "M" ]]      && modified=$((modified + 1))
         [[ "$index_status$work_status" == "??" ]] && untracked=$((untracked + 1))
