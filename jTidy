@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	jTidy 4.0
+#	jTidy 4.1
 #	Audit the macOS home directory and guide an interactive cleanup
 #	Dependencies: fzf, brew
 #	Keywords: cleanup, organize, home directory, dotfiles, audit, declutter
@@ -25,11 +25,11 @@ _home_bytes()  { du -sk ~ 2>/dev/null | awk '{print $1 * 1024}'; }
 
 _bytes_hr() {
     awk -v bytes="$1" 'BEGIN {
-        if (bytes >= 1099511627776) printf "%.1fT", bytes/1099511627776
-        else if (bytes >= 1073741824) printf "%.2fG", bytes/1073741824
-        else if (bytes >= 1048576)    printf "%.1fM", bytes/1048576
-        else if (bytes >= 1024)       printf "%.1fK", bytes/1024
-        else                          printf "%dB", bytes
+        if (bytes >= 1099511627776) { printf "%.1fT", bytes/1099511627776; exit }
+        if (bytes >= 1073741824)    { printf "%.2fG", bytes/1073741824;    exit }
+        if (bytes >= 1048576)       { printf "%.1fM", bytes/1048576;       exit }
+        if (bytes >= 1024)          { printf "%.1fK", bytes/1024;          exit }
+        printf "%dB", bytes
     }'
 }
 
