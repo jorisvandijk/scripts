@@ -27,7 +27,8 @@ case "$1" in
     *.tbz2)     j::require tar;     tar xvjf "$1"   ;;
     *.tgz)      j::require tar;     tar xvzf "$1"   ;;
     *.txz)      j::require tar;     tar xvJf "$1"   ;;
-    *.zip)      j::require unzip;   unzip "$1"      ;;
+    # *.zip)      j::require unzip;   unzip "$1"      ;;
+    *.zip)      j::require 7zz;   	7zz x "$1"     	;;
     *.7z)       j::require 7zz;     7zz x "$1"      ;;
     *.xz)       j::require unxz;    unxz -k "$1"    ;;
     *)          j::die "Unknown archive format: '$1'" ;;
