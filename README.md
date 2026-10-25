@@ -237,6 +237,7 @@ This dies with a clear message if any listed variable is unset, pointing the use
 | `JVAR_GIT_USERNAME` | jNewRepo | Git forge username |
 | `JVAR_REPOS_DIR` | jRepos | Base directory scanned for git repos |
 | `JVAR_DOTFILES_DIR` | jTidy | Dotfiles repository path |
+| `JVAR_NOTE_TITLE` | jNote | Title of the Apple Notes note to open |
 
 ---
 
@@ -256,6 +257,7 @@ This dies with a clear message if any listed variable is unset, pointing the use
 | `jList` | Directory listing with eza |
 | `jLxc` | Toggle Proxmox LXC containers on/off |
 | `jNewRepo` | Initialize a local git repo and create it on GitHub, GitLab, Codeberg, and Bitbucket |
+| `jNote` | Launch or raise Apple Notes and open a specific note |
 | `jOpenFzf` | Select files with bat preview and open in micro |
 | `jPush` | Stage, commit, and push to Git |
 | `jRename` | Rename files in current directory: lowercase, spaces and underscores to hyphens |

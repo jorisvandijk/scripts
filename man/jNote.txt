@@ -1,0 +1,43 @@
+NAME
+    jNote - launch or raise Apple Notes and open a specific note
+
+SYNOPSIS
+    jNote
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+Launches Apple Notes, or brings it to the front if already running, and
+opens the note titled JVAR_NOTE_TITLE (configured in j.vars). The note is
+selected and scrolled into view as if it had been double-clicked in the
+notes list.
+
+EXAMPLES
+
+    jNote
+        Launch or raise Notes and open the configured note.
+
+RAYCAST
+
+A companion Raycast Script Command lives at ~/git/extras/raycast/ramNote,
+alongside the other Script Commands Raycast is already configured to read.
+It appears in Raycast as "Open RAM Note".
+
+~/git/extras/raycast/ramNote looks like this:
+
+    #!/bin/bash
+
+    # @raycast.schemaVersion 1
+    # @raycast.title Open RAM Note
+    # @raycast.mode silent
+    # @raycast.icon 📝
+    # @raycast.packageName Notes
+
+    "$HOME/git/scripts/jNote"
+
+KEYWORDS
+
+    notes, apple notes, open note, launch, raise, activate, ram, raycast

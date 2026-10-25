@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+#	jNote 4.0
+#	Launch or raise Apple Notes and open a specific note
+#	Dependencies: osascript (macOS)
+#	Keywords: notes, apple notes, open note, ram, launch, raise, activate
+#	Usage: jNote
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jNote" && exit 0
+[[ -n "$1" ]]                             && j::die "Usage: jNote (no arguments)"
+
+j::require_vars JVAR_NOTE_TITLE
+j::require osascript
+
+_open_note() {
+    osascript <<EOF
+tell application "Notes"
+    activate
+    try
+        show (first note whose name is "${JVAR_NOTE_TITLE}")
+    on error
+        return "NOTFOUND"
+    end try
+end tell
+EOF
+}
+
+RESULT=$(_open_note)
+
+[[ "$RESULT" == "NOTFOUND" ]] && j::die "Note '${JVAR_NOTE_TITLE}' not found in Apple Notes"
+
+j::info "Opened note '${JVAR_NOTE_TITLE}'"
