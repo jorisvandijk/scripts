@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #	jBundle 4.0
 #	Show and copy the bundle identifier of a macOS app
-#	Dependencies: mdls, PlistBuddy, pbcopy, fzf, find
+#	Dependencies: mdls, PlistBuddy, pbcopy, fzf, find, sort
 #	Keywords: bundle, identifier, bundle id, app id, cfbundleidentifier, mdls, plist, macos
 #	Usage: jBundle <app name | path/to/App.app>
 #
@@ -33,6 +33,7 @@ _find_apps() {
     for dir in "${SEARCH_DIRS[@]}"; do
         [[ -d "$dir" ]] && existing+=("$dir")
     done
+    (( ${#existing[@]} > 0 )) || return 0
     find "${existing[@]}" -maxdepth "$SEARCH_DEPTH" -name '*.app' -prune -print 2>/dev/null | sort -u
 }
 
@@ -53,7 +54,7 @@ _match_apps() {
 # Turns the argument into one app path: a path as given, one exact match, or a pick from the matches.
 _resolve_app() {
     local input="$1" matches choice
-    [[ "$input" == */* || -d "$input" ]] && { _resolve_path "$input"; return; }
+    [[ "$input" == */* || ( "$input" == *.app && -d "$input" ) ]] && { _resolve_path "$input"; return; }
     APPS="$(_find_apps)"
     matches="$(_match_apps exact "$input")"
     [[ -n "$matches" && "$matches" != *$'\n'* ]] && { printf '%s\n' "${matches##*$'\t'}"; return; }
