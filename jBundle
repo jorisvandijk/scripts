@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+#	jBundle 4.0
+#	Show and copy the bundle identifier of a macOS app
+#	Dependencies: mdls, PlistBuddy, pbcopy, fzf, find
+#	Keywords: bundle, identifier, bundle id, app id, cfbundleidentifier, mdls, plist, macos
+#	Usage: jBundle <app name | path/to/App.app>
+#
+#	By Joris van Dijk | Jorisvandijk.com
+#	Licensed under the MIT license
+
+source "$(dirname "${BASH_SOURCE[0]}")/j"
+
+[[ "$1" == "--version" || "$1" == "-v" ]] && j::version "$0" && exit 0
+[[ "$1" == "--help"    || "$1" == "-h" ]] && j::help "jBundle" && exit 0
+[[ -z "$1" ]] && j::die "usage: jBundle <app name | path/to/App.app>"
+
+PLISTBUDDY="/usr/libexec/PlistBuddy"
+MDLS_ID_KEY="kMDItemCFBundleIdentifier"
+MDLS_NO_VALUE="(null)"
+SEARCH_DEPTH=2
+SEARCH_DIRS=(
+    "/Applications"
+    "/System/Applications"
+    "/System/Library/CoreServices"
+    "$HOME/Applications"
+)
+# Where Info.plist sits: a normal Mac app, a wrapped iPhone or iPad app, a bare bundle.
+PLIST_PATHS=("Contents/Info.plist" "WrappedBundle/Info.plist" "Info.plist")
+
+# Prints every .app in the search folders, one per line, without looking inside apps.
+_find_apps() {
+    local dir existing=()
+    for dir in "${SEARCH_DIRS[@]}"; do
+        [[ -d "$dir" ]] && existing+=("$dir")
+    done
+    find "${existing[@]}" -maxdepth "$SEARCH_DEPTH" -name '*.app' -prune -print 2>/dev/null | sort -u
+}
+
+# Prints the apps whose name is the query (exact) or contains it (partial), as "name<TAB>folder<TAB>path".
+_match_apps() {
+    local mode="$1" query="${2%.app}" app name
+    while IFS= read -r app; do
+        name="${app##*/}"
+        name="${name%.app}"
+        case "$mode" in
+            exact)   [[ "${name,,}" == "${query,,}" ]] || continue ;;
+            partial) [[ "${name,,}" == *"${query,,}"* ]] || continue ;;
+        esac
+        printf '%s\t%s\t%s\n' "$name" "${app%/*}" "$app"
+    done <<< "$APPS"
+}
+
+# Turns the argument into one app path: a path as given, one exact match, or a pick from the matches.
+_resolve_app() {
+    local input="$1" matches choice
+    [[ "$input" == */* || -d "$input" ]] && { _resolve_path "$input"; return; }
+    APPS="$(_find_apps)"
+    matches="$(_match_apps exact "$input")"
+    [[ -n "$matches" && "$matches" != *$'\n'* ]] && { printf '%s\n' "${matches##*$'\t'}"; return; }
+    [[ -z "$matches" ]] && matches="$(_match_apps partial "$input")"
+    [[ -z "$matches" ]] && j::die "couldn't find an app called \"$input\" in ${SEARCH_DIRS[*]}"
+    choice="$(j::pick_table "App" "1,2" single <<< "$matches")" || exit 0
+    printf '%s\n' "${choice##*$'\t'}"
+}
+
+# Checks that a path given on the command line is an app bundle and prints it without a trailing slash.
+_resolve_path() {
+    local path="${1%/}"
+    [[ -d "$path" ]] || j::die "couldn't find $path"
+    [[ "$path" == *.app ]] || j::die "couldn't use $path: not an .app bundle"
+    printf '%s\n' "$path"
+}
+
+# Prints the app's Info.plist path, or nothing if it has none.
+_plist_of() {
+    local app="$1" candidate
+    for candidate in "${PLIST_PATHS[@]}"; do
+        [[ -f "$app/$candidate" ]] && { printf '%s\n' "$app/$candidate"; return; }
+    done
+}
+
+# Prints one key from a plist, or nothing when the key is missing.
+_plist_value() {
+    local plist="$1" key="$2"
+    [[ -n "$plist" ]] || return 0
+    # A missing key is an expected answer, so PlistBuddy's error is dropped.
+    "$PLISTBUDDY" -c "Print :$key" "$plist" 2>/dev/null
+}
+
+# Prints the bundle id Spotlight has indexed for the app, or nothing.
+_spotlight_id() {
+    local value
+    # An app Spotlight never indexed is an expected answer, so mdls's error is dropped.
+    value="$(mdls -raw -name "$MDLS_ID_KEY" "$1" 2>/dev/null)"
+    [[ "$value" == "$MDLS_NO_VALUE" ]] && return 0
+    printf '%s' "$value"
+}
+
+# Prints how the two sources compare: match, mismatch, plist-only, spotlight-only or none.
+_compare_ids() {
+    local plist_id="$1" spotlight_id="$2"
+    case "${plist_id:+p}${spotlight_id:+s}" in
+        ps) [[ "$plist_id" == "$spotlight_id" ]] && echo "match" || echo "mismatch" ;;
+        p)  echo "plist-only" ;;
+        s)  echo "spotlight-only" ;;
+        *)  echo "none" ;;
+    esac
+}
+
+# Prints a source's row: green when it agrees, yellow when it differs, red when it is empty.
+_source_row() {
+    local label="$1" value="$2" chosen="$3"
+    [[ -z "$value" ]] && { j::row "$J_RED" "$label" "not found"; return; }
+    [[ "$value" == "$chosen" ]] && { j::row "$J_GREEN" "$label" "$value"; return; }
+    j::row "$J_YELLOW" "$label" "$value"
+}
+
+# Prints the details table for a terminal.
+_show_details() {
+    local version build
+    version="$(_plist_value "$PLIST" CFBundleShortVersionString)"
+    build="$(_plist_value "$PLIST" CFBundleVersion)"
+    j::info "bundle id of $APP_NAME"
+    j::msg ""
+    j::row "$J_BOLD$J_GREEN" "Bundle ID" "$BUNDLE_ID"
+    j::row "" "Name" "$APP_NAME"
+    j::row "" "Version" "${version:-unknown}${build:+ ($build)}"
+    j::row "$J_DIM" "Path" "$APP"
+    _source_row "Info.plist" "$PLIST_ID" "$BUNDLE_ID"
+    _source_row "Spotlight (mdls)" "$SPOTLIGHT_ID" "$BUNDLE_ID"
+    j::msg ""
+}
+
+# Warns about every way the two sources disagree.
+_warn_about() {
+    case "$1" in
+        mismatch)       j::warn "the Info.plist and Spotlight ids differ: copied the Info.plist id" ;;
+        plist-only)     j::warn "Spotlight has no bundle id for $APP_NAME: used Info.plist only" ;;
+        spotlight-only) j::warn "Info.plist has no bundle id for $APP_NAME: used Spotlight only" ;;
+    esac
+}
+
+[[ "$(j::os)" == "macos" ]] || j::die "couldn't run jBundle: bundle ids only exist on macos"
+j::require mdls pbcopy find sort
+[[ -x "$PLISTBUDDY" ]] || j::die "couldn't find PlistBuddy at $PLISTBUDDY"
+
+APP="$(_resolve_app "$1")" || exit 1
+[[ -z "$APP" ]] && exit 0
+APP_NAME="${APP##*/}"
+APP_NAME="${APP_NAME%.app}"
+PLIST="$(_plist_of "$APP")"
+PLIST_ID="$(_plist_value "$PLIST" CFBundleIdentifier)"
+SPOTLIGHT_ID="$(_spotlight_id "$APP")"
+VERDICT="$(_compare_ids "$PLIST_ID" "$SPOTLIGHT_ID")"
+
+[[ "$VERDICT" == "none" ]] && j::die "couldn't read a bundle id for $APP_NAME: neither Info.plist nor Spotlight has one"
+
+BUNDLE_ID="${PLIST_ID:-$SPOTLIGHT_ID}"
+printf '%s' "$BUNDLE_ID" | pbcopy || j::warn "couldn't copy the bundle id to the clipboard"
+
+[[ -t 1 ]] || { printf '%s\n' "$BUNDLE_ID"; _warn_about "$VERDICT"; exit 0; }
+
+_show_details
+_warn_about "$VERDICT"
+j::info "copied $BUNDLE_ID to the clipboard"

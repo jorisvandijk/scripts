@@ -247,6 +247,7 @@ This dies with a clear message if any listed variable is unset, pointing the use
 |---|---|
 | `j` | jScripts shared library and CLI tooling |
 | `jBlog` | Write and publish a Hugo blog post |
+| `jBundle` | Show and copy the bundle identifier of a macOS app |
 | `jEject` | Eject a mounted drive |
 | `jFindApp` | Search for an app across App Store, Homebrew, and Nix |
 | `jExtract` | Smart archive extraction |
