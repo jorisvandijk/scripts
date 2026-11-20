@@ -1,0 +1,46 @@
+NAME
+    jBundle - show and copy the bundle identifier of a macOS app
+
+SYNOPSIS
+    jBundle [options] <app name | path/to/App.app>
+
+    Options:
+      -h, --help      Show this help
+      -v, --version   Show version
+
+DESCRIPTION
+
+Finds an app and prints its bundle identifier (CFBundleIdentifier), then
+copies it to the clipboard.
+
+The argument is an app name or a path to an .app bundle. A name is looked
+up in /Applications, /System/Applications, /System/Library/CoreServices and
+~/Applications, and one folder deeper in each (such as Utilities or Chrome
+Apps). Matching ignores case, and ".app" at the end is optional. One exact
+match is used straight away. Several exact matches, or no exact match but
+apps whose names contain the argument, open a picker. Pressing Escape in the
+picker exits without doing anything.
+
+The id is read twice: from the app's Info.plist with PlistBuddy, and from
+Spotlight with mdls. The Info.plist value wins. A warning shows when the two
+differ or when one of them has no id. When neither has one, jBundle stops
+with an error.
+
+In a terminal it shows a table with the name, version, path and both ids.
+When the output goes to a pipe, it prints only the bare id. jBundle only
+runs on macOS.
+
+EXAMPLES
+
+    jBundle Claude
+        Show and copy the bundle id of Claude.app.
+
+    jBundle ~/Applications/Frigate.app
+        Show and copy the bundle id of the app at that path.
+
+    ID=$(jBundle safari)
+        Store only the id in a variable, for use in another command.
+
+KEYWORDS
+
+    bundle, identifier, bundle id, app id, cfbundleidentifier, mdls, plist, macos
