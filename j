@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#	j 4.0
+#	j 4.1
 #	jScripts shared library and CLI tooling
 #	Dependencies: none
 #	Keywords: library, cli, help, list, new, man
@@ -36,11 +36,16 @@ J_FZF_STYLE=(
 _J_VARS="$(dirname "${BASH_SOURCE[0]}")/j.vars"
 [[ -f "$_J_VARS" ]] && source "$_J_VARS"
 
-_j_cap() { local text="$*"; printf '%s' "${text^}"; }
+# Starts every message lowercase, as a fallback for older callers. Leaves acronyms like GOG alone.
+_j_lower_first() {
+    local text="$*"
+    [[ "${text:1:1}" == [[:upper:]] ]] && { printf '%s' "$text"; return; }
+    printf '%s' "${text,}"
+}
 
-j::info()  { printf "${J_GREEN}[INFO]${J_RESET} %s\n"     "$(_j_cap "$*")"; }
-j::warn()  { printf "${J_YELLOW}[WARNING]${J_RESET} %s\n" "$(_j_cap "$*")" >&2; }
-j::error() { printf "${J_RED}[ERROR]${J_RESET} %s\n"      "$(_j_cap "$*")" >&2; }
+j::info()  { printf "[${J_GREEN}info${J_RESET}] %s\n"   "$(_j_lower_first "$*")"; }
+j::warn()  { printf "[${J_YELLOW}warn${J_RESET}] %s\n"  "$(_j_lower_first "$*")" >&2; }
+j::error() { printf "[${J_RED}error${J_RESET}] %s\n"    "$(_j_lower_first "$*")" >&2; }
 j::die()   { j::error "$*"; exit 1; }
 j::row()   { printf "${1}%-20s %s${J_RESET}\n" "$2" "$3"; }
 
@@ -54,7 +59,7 @@ j::require() {
 j::require_vars() {
     local var
     for var in "$@"; do
-        [[ -n "${!var}" ]] || j::die "$var is not set — add it to j.vars"
+        [[ -n "${!var}" ]] || j::die "$var is not set: add it to j.vars"
     done
 }
 
